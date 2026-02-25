@@ -1,6 +1,6 @@
-// Project Title
-// Your Name
-// Date
+// Forest Flyer
+// Artin Kamyar
+// 2/25/2026
 //
 // Extra for Experts:
 // - describe what you did to take this project "above and beyond"
@@ -68,10 +68,12 @@ function draw() {
 
   if (gameState === "waiting") {
     drawWaitingScreen();
-  } else if (gameState === "playing") {
+  } 
+  else if (gameState === "playing") {
     updateGame();
     drawGame();
-  } else if (gameState === "dead") {
+  } 
+  else if (gameState === "dead") {
     drawGame();
     drawDeadScreen();
   }
@@ -132,9 +134,15 @@ function updateGame() {
   }
 
   // Check collisions with each pillar
-  if (checkCloudCollision(cloud1X, cloud1GapY)) gameState = "dead";
-  if (checkCloudCollision(cloud2X, cloud2GapY)) gameState = "dead";
-  if (checkCloudCollision(cloud3X, cloud3GapY)) gameState = "dead";
+  if (checkCloudCollision(cloud1X, cloud1GapY)) {
+    gameState = "dead";
+  }
+  if (checkCloudCollision(cloud2X, cloud2GapY)) {
+    gameState = "dead";
+  }
+  if (checkCloudCollision(cloud3X, cloud3GapY)) {
+    gameState = "dead";
+  }
 }
 
 // Draws all game objects
@@ -192,8 +200,7 @@ function checkCloudCollision(pillarX, gapY) {
   let birdHitbox = birdSize * 0.6;
 
   // Check if bird overlaps with pillar horizontally
-  let inXRange = (birdX + birdHitbox / 2 > pillarX - pillarWidth / 2) &&
-                 (birdX - birdHitbox / 2 < pillarX + pillarWidth / 2);
+  let inXRange = birdX + birdHitbox / 2 > pillarX - pillarWidth / 2 && birdX - birdHitbox / 2 < pillarX + pillarWidth / 2;
 
   // Check if bird hits top or bottom cloud
   let hitsTop = birdY - birdHitbox / 2 < topCloudBottom;
@@ -237,8 +244,12 @@ function drawDeadScreen() {
 
 // Makes bird jump
 function flap() {
-  if (gameState === "waiting") gameState = "playing";
-  if (gameState === "playing") birdVelocity = flapStrength;
+  if (gameState === "waiting") {
+    gameState = "playing";
+  }
+  if (gameState === "playing") {
+    birdVelocity = flapStrength;
+  }
 }
 
 // Resets game
@@ -265,8 +276,12 @@ function mousePressed() {
 
 // Keyboard interaction
 function keyPressed() {
-  if (key === ' ') flap();
-  if ((key === 'r' || key === 'R') && gameState === "dead") resetGame();
+  if (key === ' ') {
+    flap();
+  }
+  if ((key === 'r' || key === 'R') && gameState === "dead") {
+    resetGame();
+  }
 }
 
 // Window resize handler
