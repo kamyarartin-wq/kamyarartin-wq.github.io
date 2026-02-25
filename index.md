@@ -2,6 +2,7 @@
 
 ## Demo
 - [Moving Square](first-day)
+- [Scope](scope)
 
 ## Assignments
 - [Interactive Scene](Interactive-scene)
