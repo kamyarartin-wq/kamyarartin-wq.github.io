@@ -46,9 +46,9 @@ function preload() {
   birdImg = loadImage('red-bird.png');
   cloudImg = loadImage('gray-cloud.png');
   forestBg = loadImage('forest.png');
-  mountainBg = loadImage('mountain.png');
-  natureBg = loadImage('nature.png');
-  desertBg = loadImage('desert.png');
+  mountainBg = loadImage('mountain.jpg');
+  natureBg = loadImage('nature.jpg');
+  desertBg = loadImage('desert.jpg');
 }
 
 function setup() {
