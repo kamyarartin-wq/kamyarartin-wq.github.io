@@ -1,4 +1,4 @@
-// Forest Flyer
+// Flappy Bird
 // Artin Kamyar
 // 2/25/2026
 //
@@ -18,6 +18,9 @@ let flapStrength = -9;
 let birdImg;
 let cloudImg;
 let forestBg;
+let mountainBg;
+let natureBg;
+let desertBg;
 
 // Game state tracking
 let gameState = "waiting";
@@ -43,14 +46,16 @@ function preload() {
   birdImg = loadImage('red-bird.png');
   cloudImg = loadImage('gray-cloud.png');
   forestBg = loadImage('forest.png');
+  mountainBg = loadImage('mountain.png');
+  natureBg = loadImage('nature.png');
+  desertBg = loadImage('desert.png');
 }
 
-// Setup runs once at start
 function setup() {
+  // Set up starting positions
   createCanvas(windowWidth, windowHeight);
   birdY = height / 2;
-  
-  // Set up starting positions
+
   cloud1X = width + 200;
   cloud1GapY = random(height * 0.3, height * 0.7);
   
@@ -61,11 +66,22 @@ function setup() {
   cloud3GapY = random(height * 0.3, height * 0.7);
 }
 
-// Draw runs every frame
 function draw() {
-  // Draw forest background stretched to fill screen
-  image(forestBg, 0, 0, width, height);
+  // Change background based on score
+  if (score > 15) {
+    image(natureBg, 0, 0, width, height);
+  }
+  else if (score > 10) {
+    image(mountainBg, 0, 0, width, height);
+  }
+  else if (score > 5) {
+    image(desertBg, 0, 0, width, height);
+  }
+  else {
+    image(forestBg, 0, 0, width, height);
+  }
 
+  // Use functions based on gameState
   if (gameState === "waiting") {
     drawWaitingScreen();
   } 
@@ -88,7 +104,7 @@ function drawWaitingScreen() {
   strokeWeight(3);
   textAlign(CENTER);
   textSize(34);
-  text("FOREST FLYER", width / 2, height / 2 - 100);
+  text("Flappy Bird", width / 2, height / 2 - 100);
 
   fill(255);
   stroke(0);
