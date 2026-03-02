@@ -3,8 +3,8 @@
 // 2/25/2026
 //
 // Extra for Experts:
-// - describe what you did to take this project "above and beyond"
-
+// I added windowResized() function that adjusts the canvas size when the user resizes their browser window using resizeCanvas() https://p5js.org/reference/p5/windowResized/ https://p5js.org/reference/p5/resizeCanvas/.
+// The game recalculates cloud pillar gap positions to fit the new screen height and keeps the bird in view.
 
 // Bird variables
 let birdX = 120;
@@ -38,6 +38,7 @@ let cloud2GapY;
 let cloud3X;
 let cloud3GapY;
 
+// Cloud settings
 let cloudSpeed = 4;
 let cloudGapHeight = 180;
 
