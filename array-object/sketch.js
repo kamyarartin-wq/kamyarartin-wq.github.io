@@ -25,17 +25,8 @@ let desertBg;
 let gameState = "waiting";
 let score = 0;
 
-// Cloud pillar 1
-let cloud1X;
-let cloud1GapY;
-
-// Cloud pillar 2
-let cloud2X;
-let cloud2GapY;
-
-// Cloud pillar 3
-let cloud3X;
-let cloud3GapY;
+// Cloud pillar objects
+let cloudPillars = [];
 
 // Cloud settings
 let cloudSpeed = 4;
@@ -56,14 +47,21 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   birdY = height / 2;
 
-  cloud1X = width + 200;
-  cloud1GapY = random(height * 0.3, height * 0.7);
+  // Creat 3 pillar objects using push()
+  cloudPillars.push({
+    x: width + 200,
+    gapY: random((height * 0.3, height * 0.7)),
+  });
   
-  cloud2X = width + 550;
-  cloud2GapY = random(height * 0.3, height * 0.7);
-  
-  cloud3X = width + 900;
-  cloud3GapY = random(height * 0.3, height * 0.7);
+  cloudPillars.push({
+    x: width + 550,
+    gapY: random((height * 0.3, height * 0.7)),
+  });
+
+  cloudPillars.push({
+    x: width + 900,
+    gapY: random((height * 0.3, height * 0.7)),
+  });
 }
 
 function draw() {
@@ -120,28 +118,15 @@ function updateGame() {
   birdVelocity += gravity;
   birdY += birdVelocity;
 
-  // Move pillar 1
-  cloud1X -= cloudSpeed;
-  if (cloud1X < -100) {
-    cloud1X = width + 100;
-    cloud1GapY = random(height * 0.3, height * 0.7);
-    score++;
-  }
+  // Update all pillars using for loop and array
+  for (let i = 0; i < cloudPillars.length; i++) {
+    cloudPillars[i].x -= cloudSpeed;
 
-  // Move pillar 2
-  cloud2X -= cloudSpeed;
-  if (cloud2X < -100) {
-    cloud2X = width + 100;
-    cloud2GapY = random(height * 0.3, height * 0.7);
-    score++;
-  }
-
-  // Move pillar 3
-  cloud3X -= cloudSpeed;
-  if (cloud3X < -100) {
-    cloud3X = width + 100;
-    cloud3GapY = random(height * 0.3, height * 0.7);
-    score++;
+    if (cloudPillars[i].x  <  -100) {
+      cloudPillars[i].x = width + 100;
+      cloudPillars[i].gapY = random(height * 0.3, height * 0.7);
+      score++;
+    }
   }
 
   // Death if hits ground or ceiling
@@ -149,23 +134,21 @@ function updateGame() {
     gameState = "dead";
   }
 
-  // Check collisions with each pillar
-  if (checkCloudCollision(cloud1X, cloud1GapY)) {
-    gameState = "dead";
-  }
-  if (checkCloudCollision(cloud2X, cloud2GapY)) {
-    gameState = "dead";
-  }
-  if (checkCloudCollision(cloud3X, cloud3GapY)) {
-    gameState = "dead";
+  // Check collisions using for loop
+  for (let i = 0; i < cloudPillars.length; i++) {
+    if (checkCloudCollision(cloudPillars[i].x, cloudPillars[i].gapY)) {
+      gameState = "dead";
+    }
   }
 }
 
 // Draws all game objects
 function drawGame() {
-  drawCloudPillar(cloud1X, cloud1GapY);
-  drawCloudPillar(cloud2X, cloud2GapY);
-  drawCloudPillar(cloud3X, cloud3GapY);
+  // Draw all pillars using for loop
+  for (let i = 0; i < cloudPillars.length; i++) {
+    drawCloudPillar(cloudPillars[i].x, cloudPillars[i].gapY);
+  }
+  
   drawBird();
   drawScore();
 }
@@ -275,14 +258,15 @@ function resetGame() {
   score = 0;
   gameState = "waiting";
   
-  cloud1X = width + 200;
-  cloud1GapY = random(height * 0.3, height * 0.7);
+  // Reset all pillars using for loop
+  cloudPillars[0].x = width + 200;
+  cloudPillars[0].gapY = random(height * 0.3, height * 0.7);
   
-  cloud2X = width + 550;
-  cloud2GapY = random(height * 0.3, height * 0.7);
+  cloudPillars[1].x = width + 550;
+  cloudPillars[1].gapY = random(height * 0.3, height * 0.7);
   
-  cloud3X = width + 900;
-  cloud3GapY = random(height * 0.3, height * 0.7);
+  cloudPillars[2].x = width + 900;
+  cloudPillars[2].gapY = random(height * 0.3, height * 0.7);
 }
 
 // Mouse interaction
