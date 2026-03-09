@@ -50,17 +50,17 @@ function setup() {
   // Creat 3 pillar objects using push()
   cloudPillars.push({
     x: width + 200,
-    gapY: random((height * 0.3, height * 0.7)),
+    gapY: random(height * 0.3, height * 0.7),
   });
   
   cloudPillars.push({
     x: width + 550,
-    gapY: random((height * 0.3, height * 0.7)),
+    gapY: random(height * 0.3, height * 0.7),
   });
 
   cloudPillars.push({
     x: width + 900,
-    gapY: random((height * 0.3, height * 0.7)),
+    gapY: random(height * 0.3, height * 0.7),
   });
 }
 
