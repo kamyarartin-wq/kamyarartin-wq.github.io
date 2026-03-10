@@ -24,6 +24,7 @@ let desertBg;
 // Game state tracking
 let gameState = "waiting";
 let score = 0;
+let isFlipped = false;
 
 // Cloud pillar objects
 let cloudPillars = [];
@@ -65,6 +66,15 @@ function setup() {
 }
 
 function draw() {
+  push();
+
+  if (isFlipped) {
+    // Move origin to center then rotate 180 degrees and move origin back
+    translate(width / 2, height / 2);
+    rotate(PI); 
+    translate(-width / 2, -height / 2);
+  }
+
   // Change background based on score
   if (score > 15) {
     image(natureBg, 0, 0, width, height);
@@ -91,6 +101,8 @@ function draw() {
     drawGame();
     drawDeadScreen();
   }
+
+  pop();
 }
 
 // Title and instructions screen
@@ -126,6 +138,11 @@ function updateGame() {
       cloudPillars[i].x = width + 100;
       cloudPillars[i].gapY = random(height * 0.3, height * 0.7);
       score++;
+
+      // 15% chance to flip the screen with every score
+      if (random(1) < 0.15) {
+        isFlipped = !isFlipped;
+      }
     }
   }
 
@@ -193,7 +210,7 @@ function drawCloudPillar(pillarX, gapY) {
 function checkCloudCollision(pillarX, gapY) {
   let topCloudBottom = gapY - cloudGapHeight / 2;
   let bottomCloudTop = gapY + cloudGapHeight / 2;
-  let pillarWidth = 80;
+  let pillarWidth = 90; // It is 90 so play doesn't die to edges
   
   // Bird hitbox is 60% of visual size
   let birdHitbox = birdSize * 0.6;
@@ -253,6 +270,7 @@ function flap() {
 
 // Resets game
 function resetGame() {
+  isFlipped = false;
   birdY = height / 2;
   birdVelocity = 0;
   score = 0;
@@ -292,7 +310,7 @@ function windowResized() {
     birdY = height / 2;
   }
   
-  cloud1GapY = random(height * 0.3, height * 0.7);
-  cloud2GapY = random(height * 0.3, height * 0.7);
-  cloud3GapY = random(height * 0.3, height * 0.7);
+  for (let pillar of cloudPillars) {
+    pillar.gapY = random(height * 0.3, height * 0.7);
+  }
 }
