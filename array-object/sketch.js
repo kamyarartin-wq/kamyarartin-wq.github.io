@@ -32,6 +32,7 @@ let cloudPillars = [];
 // Cloud settings
 let cloudSpeed = 4;
 let cloudGapHeight = 180;
+let speedIncrease = 0.1;
 
 // Preload images before setup runs
 function preload() {
@@ -139,6 +140,9 @@ function updateGame() {
       cloudPillars[i].gapY = random(height * 0.3, height * 0.7);
       score++;
 
+      // Increase speed with score
+      cloudSpeed += speedIncrease;
+
       // 15% chance to flip the screen with every score
       if (random(1) < 0.15) {
         isFlipped = !isFlipped;
@@ -210,7 +214,7 @@ function drawCloudPillar(pillarX, gapY) {
 function checkCloudCollision(pillarX, gapY) {
   let topCloudBottom = gapY - cloudGapHeight / 2;
   let bottomCloudTop = gapY + cloudGapHeight / 2;
-  let pillarWidth = 90; // It is 90 so play doesn't die to edges
+  let pillarWidth = 80; // It is 80 so play doesn't die to edges
   
   // Bird hitbox is 60% of visual size
   let birdHitbox = birdSize * 0.6;
@@ -274,6 +278,7 @@ function resetGame() {
   birdY = height / 2;
   birdVelocity = 0;
   score = 0;
+  cloudSpeed = 4;
   gameState = "waiting";
   
   // Reset all pillars using for loop
