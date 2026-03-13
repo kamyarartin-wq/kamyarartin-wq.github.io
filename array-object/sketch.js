@@ -5,13 +5,8 @@
 // Extra for Experts:
 // - describe what you did to take this project "above and beyond"
 
-// Bird variables
-let birdX = 120;
-let birdY;
-let birdVelocity = 0;
-let birdSize = 35;
-let gravity = 0.45;
-let flapStrength = -9;
+// Bird array
+let birds = [];
 
 // Images
 let birdImg;
@@ -29,10 +24,13 @@ let isFlipped = false;
 // Cloud pillar objects
 let cloudPillars = [];
 
-// Cloud settings
-let cloudSpeed = 4;
-let cloudGapHeight = 180;
-let speedIncrease = 0.1;
+// Settings based on window size
+let cloudSpeed;
+let cloudGapHeight;
+let pillarSpacing;
+let pillarWidth;
+let numPillars;
+let gravity;
 
 // Preload images before setup runs
 function preload() {
@@ -45,25 +43,45 @@ function preload() {
 }
 
 function setup() {
-  // Set up starting positions
   createCanvas(windowWidth, windowHeight);
-  birdY = height / 2;
-
-  // Creat 3 pillar objects using push()
-  cloudPillars.push({
-    x: width + 200,
-    gapY: random(height * 0.3, height * 0.7),
-  });
   
-  cloudPillars.push({
-    x: width + 550,
-    gapY: random(height * 0.3, height * 0.7),
-  });
+  // Calculate all sizes based on window
+  calculateSizes();
 
-  cloudPillars.push({
-    x: width + 900,
-    gapY: random(height * 0.3, height * 0.7),
-  });
+  // Create bird object
+  birds.push({
+    x: width * 0.15,
+    y: height / 2,
+    velocity: 0,
+    size: width * 0.055,
+    flapStrength: - height * 0.0155
+  })
+
+  // Create all the pillars using a function with loops
+  createPillars();
+}
+
+// Calculates all sizes as percentages of window dimensions so everything scales when you resize the window
+function calculateSizes() {
+  cloudSpeed = width * 0.003;
+  cloudGapHeight = height * 0.35;
+  gravity = height * 0.0009;
+  pillarSpacing = width / 4; // Pillars are evenly spaced at 1/4 screen width
+  pillarWidth = width * 0.08;
+  numPillars = Math.ceil(width / pillarSpacing) + 2;  // Calculate how many pillars fit on screen
+}
+
+// Creates pillars evenly spaced across the screen using a for loop
+function createPillars() {
+  cloudPillars = [];
+  
+  // For loop creates all pillars and adds them
+  for (let i = 0; i < numPillars; i++) {
+    cloudPillars.push({
+      x: width + (i * pillarSpacing),
+      gapY: random(height * 0.3, height * 0.7)
+    });
+  }
 }
 
 function draw() {
