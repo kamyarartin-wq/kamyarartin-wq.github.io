@@ -53,7 +53,7 @@ function setup() {
     x: width * 0.15,
     y: height / 2,
     velocity: 0,
-    size: width * 0.055,
+    size: width * 0.05,
     flapStrength: - height * 0.0155
   })
 
@@ -78,7 +78,7 @@ function createPillars() {
   // For loop creates all pillars and adds them
   for (let i = 0; i < numPillars; i++) {
     cloudPillars.push({
-      x: width + (i * pillarSpacing),
+      x: width + i * pillarSpacing,
       gapY: random(height * 0.3, height * 0.7)
     });
   }
@@ -146,20 +146,27 @@ function drawWaitingScreen() {
 // Updates all game objects each frame
 function updateGame() {
   // Bird physics
-  birdVelocity += gravity;
-  birdY += birdVelocity;
+  birds[0].velocity += gravity;
+  birds[0].y += birds[0].velocity;
 
-  // Update all pillars using for loop and array
+  // Update all pillars using for loop
   for (let i = 0; i < cloudPillars.length; i++) {
-    cloudPillars[i].x -= cloudSpeed;
+    let currentSpeed = cloudSpeed * 1 + score * 0.04;
+    cloudPillars[i].x -= currentSpeed;
 
-    if (cloudPillars[i].x  <  -100) {
-      cloudPillars[i].x = width + 100;
+    // This creates infinite pillars without making new ones
+    if (cloudPillars[i].x < -pillarWidth) {
+      let maxX = 0;
+      for (let j = 0; j < cloudPillars.length; j++) {
+        if (cloudPillars[j].x > maxX) {
+          maxX = cloudPillars[j].x;
+        }
+      }
+      
+      // Move this pillar to the end with a new random gap
+      cloudPillars[i].x = maxX + pillarSpacing;
       cloudPillars[i].gapY = random(height * 0.3, height * 0.7);
       score++;
-
-      // Increase speed with score
-      cloudSpeed += speedIncrease;
 
       // 15% chance to flip the screen with every score
       if (random(1) < 0.15) {
@@ -169,13 +176,13 @@ function updateGame() {
   }
 
   // Death if hits ground or ceiling
-  if (birdY > height - birdSize / 2 || birdY < 0) {
+  if (birds[0].y > height - birds[0].size / 2 || birds[0].y < 0) {
     gameState = "dead";
   }
 
-  // Check collisions using for loop
+  // Check collisions with all pillars using for loop
   for (let i = 0; i < cloudPillars.length; i++) {
-    if (checkCloudCollision(cloudPillars[i].x, cloudPillars[i].gapY)) {
+    if (checkCloudCollision(cloudPillars[i])) {
       gameState = "dead";
     }
   }
@@ -185,7 +192,7 @@ function updateGame() {
 function drawGame() {
   // Draw all pillars using for loop
   for (let i = 0; i < cloudPillars.length; i++) {
-    drawCloudPillar(cloudPillars[i].x, cloudPillars[i].gapY);
+    drawCloudPillar(cloudPillars[i]);
   }
   
   drawBird();
@@ -195,54 +202,53 @@ function drawGame() {
 // Bird using image
 function drawBird() {
   push();
-  translate(birdX, birdY);
+  translate(birds[0].x, birds[0].y);
   
   // Tilt bird based on velocity
-  let angle = constrain(birdVelocity * 0.05, -0.5, 0.9);
+  let angle = constrain(birds[0].velocity * 0.05, -0.5, 0.9);
   rotate(angle);
   
   // Draw bird image centered
   imageMode(CENTER);
-  image(birdImg, 0, 0, birdSize, birdSize);
+  image(birdImg, 0, 0, birds[0].size, birds[0].size);
   
   pop();
 }
 
 // Cloud pillar using loop to stack cloud images
-function drawCloudPillar(pillarX, gapY) {
-  let topCloudBottom = gapY - cloudGapHeight / 2;
-  let bottomCloudTop = gapY + cloudGapHeight / 2;
-  let pillarWidth = 100;
-  let cloudHeight = 70;
+function drawCloudPillar(pillar) {
+  let topCloudBottom = pillar.gapY - cloudGapHeight / 2;
+  let bottomCloudTop = pillar.gapY + cloudGapHeight / 2;
+  let cloudHeight = pillarWidth * 0.7;
 
   imageMode(CORNER);
   
   // Top pillar stack clouds using for loop
   for (let y = 0; y < topCloudBottom; y += cloudHeight - 15) {
-    image(cloudImg, pillarX - pillarWidth / 2, y, pillarWidth, cloudHeight);
+    image(cloudImg, pillar.x - pillarWidth / 2, y, pillarWidth, cloudHeight);
   }
 
   // Bottom pillar stack clouds using for loop
   for (let y = bottomCloudTop; y < height; y += cloudHeight - 15) {
-    image(cloudImg, pillarX - pillarWidth / 2, y, pillarWidth, cloudHeight);
+    image(cloudImg, pillar.x - pillarWidth / 2, y, pillarWidth, cloudHeight);
   }
 }
 
 // Collision detection
-function checkCloudCollision(pillarX, gapY) {
-  let topCloudBottom = gapY - cloudGapHeight / 2;
-  let bottomCloudTop = gapY + cloudGapHeight / 2;
-  let pillarWidth = 80; // It is 80 so play doesn't die to edges
+function checkCloudCollision(pillar) {
+  let topCloudBottom = pillar.gapY - cloudGapHeight / 2;
+  let bottomCloudTop = pillar.gapY + cloudGapHeight / 2;
+  let hitboxWidth = pillarWidth * 0.80; // It is 0.80 so play doesn't die to edges
   
   // Bird hitbox is 60% of visual size
-  let birdHitbox = birdSize * 0.6;
+  let birdHitbox = birds[0].size * 0.6;
 
   // Check if bird overlaps with pillar horizontally
-  let inXRange = birdX + birdHitbox / 2 > pillarX - pillarWidth / 2 && birdX - birdHitbox / 2 < pillarX + pillarWidth / 2;
+  let inXRange = birds[0].x + birdHitbox / 2 > pillar.x - hitboxWidth / 2 && birds[0].x - birdHitbox / 2 < pillar.x + hitboxWidth / 2;
 
   // Check if bird hits top or bottom cloud
-  let hitsTop = birdY - birdHitbox / 2 < topCloudBottom;
-  let hitsBottom = birdY + birdHitbox / 2 > bottomCloudTop;
+  let hitsTop = birds[0].y - birdHitbox / 2 < topCloudBottom;
+  let hitsBottom = birds[0].y + birdHitbox / 2 > bottomCloudTop;
 
   return inXRange && (hitsTop || hitsBottom);
 }
@@ -253,8 +259,8 @@ function drawScore() {
   stroke(0);
   strokeWeight(3);
   textAlign(CENTER);
-  textSize(28);
-  text(score, width / 2, 45);
+  textSize(width * 0.04);
+  text(score, width / 2, height * 0.08);
 }
 
 // Death screen
@@ -267,17 +273,17 @@ function drawDeadScreen() {
   stroke(150, 0, 0);
   strokeWeight(3);
   textAlign(CENTER);
-  textSize(42);
-  text("YOU CRASHED!", width / 2, height / 2 - 60);
+  textSize(width * 0.06);
+  text("YOU CRASHED!", width / 2, height / 2 - height * 0.08);
 
   fill(255);
   stroke(0);
   strokeWeight(2);
-  textSize(26);
-  text("Score: " + score, width / 2, height / 2 + 5);
+  textSize(width * 0.04);
+  text("Score: " + score, width / 2, height / 2 + height * 0.01);
 
-  textSize(18);
-  text("Press R to try again", width / 2, height / 2 + 60);
+  textSize(width * 0.025);
+  text("Press R to try again", width / 2, height / 2 + height * 0.08);
 }
 
 // Makes bird jump
@@ -286,28 +292,20 @@ function flap() {
     gameState = "playing";
   }
   if (gameState === "playing") {
-    birdVelocity = flapStrength;
+    birds[0].velocity = birds[0].flapStrength;
   }
 }
 
 // Resets game
 function resetGame() {
   isFlipped = false;
-  birdY = height / 2;
-  birdVelocity = 0;
+  birds[0].y = height / 2;
+  birds[0].velocity = 0;
   score = 0;
-  cloudSpeed = 4;
   gameState = "waiting";
   
-  // Reset all pillars using for loop
-  cloudPillars[0].x = width + 200;
-  cloudPillars[0].gapY = random(height * 0.3, height * 0.7);
-  
-  cloudPillars[1].x = width + 550;
-  cloudPillars[1].gapY = random(height * 0.3, height * 0.7);
-  
-  cloudPillars[2].x = width + 900;
-  cloudPillars[2].gapY = random(height * 0.3, height * 0.7);
+  // Recreate all pillars
+  createPillars();
 }
 
 // Mouse interaction
@@ -329,11 +327,19 @@ function keyPressed() {
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   
-  if (birdY > height) {
-    birdY = height / 2;
+  // Recalculate sizes for new window
+  calculateSizes();
+  
+  // Update bird properties in birds array
+  birds[0].x = width * 0.15;
+  birds[0].size = width * 0.05;
+  birds[0].flapStrength = -height * 0.018;
+  
+  // Keep bird on screen
+  if (birds[0].y > height) {
+    birds[0].y = height / 2;
   }
   
-  for (let pillar of cloudPillars) {
-    pillar.gapY = random(height * 0.3, height * 0.7);
-  }
+  // Recreate pillars with new spacing
+  createPillars();
 }
