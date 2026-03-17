@@ -17,7 +17,8 @@ let natureBg;
 let desertBg;
 
 // Game state tracking
-let gameState = "waiting";
+let gameState = "menu";
+let gameMode = "";
 let score = 0;
 let isFlipped = false;
 
@@ -31,6 +32,19 @@ let pillarSpacing;
 let pillarWidth;
 let numPillars;
 let gravity;
+
+// shared is the same for everyone and me is just my own bird data fo p5.party
+let shared;
+let me;
+
+// One color per player so each bird looks different even though its the same image
+const playerColors = [
+  [255, 80,  80 ],   // Player 1 Red
+  [80,  150, 255],   // Player 2 Blue
+  [80,  255, 120],   // Player 3 Green
+  [255, 230, 80 ],   // Player 4 Yellow
+  [200, 80,  255],   // Player 5 Purple
+];
 
 // Preload images before setup runs
 function preload() {
@@ -55,7 +69,7 @@ function setup() {
     velocity: 0,
     size: width * 0.05,
     flapStrength: - height * 0.0155
-  })
+  });
 
   // Create all the pillars using a function with loops
   createPillars();
@@ -84,24 +98,53 @@ function createPillars() {
   }
 }
 
+// Connects to p5.party server and sets up shared and me objects
+// shared holds everything everyone needs to see like pillars and score
+// me holds just my birds data like y position and whether im dead
+function connectMultiplayer() {
+  partyConnect("wss://deepstream.p5party.org", "ForestFlyer_Artin");
+
+  shared = partyLoadShared("shared", {
+    pillars: [],
+    score: 0,
+    isFlipped: false,
+    gameState: "waiting"
+  });
+
+  // Figure out which color slot I get based on how many players joined before me
+  let playerIndex = partyGetAll().length % 5;
+
+  me = partyLoadMe({
+    y: height / 2,
+    velocity: 0,
+    isDead: false,
+    finalScore: 0,
+    playerIndex: playerIndex
+  });
+}
+
 function draw() {
   push();
 
-  if (isFlipped) {
+  // Screen flip effect works in both modes
+  // In multiplayer I check shared.isFlipped instead of the local one
+  let flipped = gameMode === "multi" && shared ? shared.isFlipped : isFlipped;
+  if (flipped) {
     // Move origin to center then rotate 180 degrees and move origin back
     translate(width / 2, height / 2);
     rotate(PI); 
     translate(-width / 2, -height / 2);
   }
 
-  // Change background based on score
-  if (score > 15) {
+  // Change background based on score shared in multiplayer
+  let currentScore = gameMode === "multi" && shared ? shared.score : score;
+  if (currentScore > 15) {
     image(natureBg, 0, 0, width, height);
   }
-  else if (score > 10) {
+  else if (currentScoree > 10) {
     image(mountainBg, 0, 0, width, height);
   }
-  else if (score > 5) {
+  else if (currentScore > 5) {
     image(desertBg, 0, 0, width, height);
   }
   else {
@@ -109,22 +152,27 @@ function draw() {
   }
 
   // Use functions based on gameState
-  if (gameState === "waiting") {
+  if (gameState === "menu") {
+    drawMenuScreen();
+  } 
+  else if (gameState === "waiting") {
     drawWaitingScreen();
   } 
   else if (gameState === "playing") {
-    updateGame();
-    drawGame();
-  } 
+    updateGame(); drawGame(); 
+  }
   else if (gameState === "dead") {
     drawGame();
     drawDeadScreen();
+  }
+  else if (gameState === "leaderboard") {
+    drawGame(); drawLeaderboard();
   }
 
   pop();
 }
 
-// Title and instructions screen
+// Title and instructions screen with two buttons to pick single or multiplayer
 function drawWaitingScreen() {
   drawBird();
 
@@ -135,67 +183,202 @@ function drawWaitingScreen() {
   textSize(34);
   text("Flappy Bird", width / 2, height / 2 - 100);
 
-  fill(255);
-  stroke(0);
+  // Drawing the two mode buttons I used rectMode CENTER so I can position from middle
+  let btnW = width * 0.25;
+  let btnH = height * 0.08;
+  let btnY = height * 0.5;
+
+  rectMode(CENTER);
+
+  fill(50, 120, 50);
+  stroke(255);
   strokeWeight(2);
-  textSize(16);
-  text("Fly through the cloud gaps!", width / 2, height / 2);
-  text("SPACE or CLICK to flap", width / 2, height / 2 + 30);
+  rect(width / 2, btnY, btnW, btnH, 10);
+  fill(255);
+  noStroke();
+  textSize(width * 0.025);
+  text("Single Player", width / 2, btnY + height * 0.012);
+
+  fill(50, 50, 150);
+  stroke(255);
+  strokeWeight(2);
+  rect(width / 2, btnY + btnH * 1.6, btnW, btnH, 10);
+  fill(255);
+  noStroke();
+  text("Multiplayer", width / 2, btnY + btnH * 1.6 + height * 0.012);
+
+  rectMode(CORNER);
+}
+
+// Waiting screen works for both modes
+// In singleplayer its just the title screen like before
+// In multiplayer it shows how many players have connected so far
+function drawWaitingScreen() {
+  drawBird();
+
+  fill(30, 30, 80);
+  stroke(255);
+  strokeWeight(3);
+  textAlign(CENTER);
+
+  if (gameMode === "single") {
+    textSize(34);
+    text("Forest Flyer", width / 2, height / 2 - 100);
+    fill(255);
+    stroke(0);
+    strokeWeight(2);
+    textSize(16);
+    text("Fly through the cloud gaps!", width / 2, height / 2);
+    text("SPACE or CLICK to flap", width / 2, height / 2 + 30);
+  } 
+  else {
+    // Multiplayer lobby shows connected players and their colored birds
+    textSize(width * 0.04);
+    text("Forest Flyer", width / 2, height * 0.3);
+    fill(255);
+    stroke(0);
+    strokeWeight(2);
+    textSize(width * 0.022);
+
+    // Show player count so everyone knows how many have joined
+    let playerCount = shared ? partyGetAll().length : 1;
+    text("Players connected: " + playerCount + " / 5", width / 2, height * 0.45);
+    text("SPACE or CLICK to start!", width / 2, height * 0.52);
+
+    // Draw a small colored bird for each connected player so you can see whos in
+    for (let i = 0; i < playerCount; i++) {
+      let c = playerColors[i];
+      tint(c[0], c[1], c[2]);
+      imageMode(CENTER);
+      image(birdImg, width / 2 + (i - 2) * birds[0].size * 2, height * 0.62, birds[0].size, birds[0].size);
+      noTint();
+    }
+  }
 }
 
 // Updates all game objects each frame
 function updateGame() {
-  // Bird physics
-  birds[0].velocity += gravity;
-  birds[0].y += birds[0].velocity;
+  // Bird physics same for both modes
+  if (gameMode === "single") {
+    birds[0].velocity += gravity;
+    birds[0].y += birds[0].velocity;
+  } else {
+    // In multiplayer I update my own me object instead of birds[0]
+    if (me && !me.isDead) {
+      me.velocity += gravity;
+      me.y += me.velocity;
+    }
+  }
 
-  // Update all pillars using for loop
-  for (let i = 0; i < cloudPillars.length; i++) {
-    let currentSpeed = cloudSpeed * 1 + score * 0.04;
-    cloudPillars[i].x -= currentSpeed;
+  // Get the right pillar array depending on mode
+  let pillars = gameMode === "multi" && shared ? shared.pillars : cloudPillars;
 
-    // This creates infinite pillars without making new ones
-    if (cloudPillars[i].x < -pillarWidth) {
-      let maxX = 0;
-      for (let j = 0; j < cloudPillars.length; j++) {
-        if (cloudPillars[j].x > maxX) {
-          maxX = cloudPillars[j].x;
+  // Only the host moves pillars and scores in multiplayer
+  let canMovePillars = gameMode === "single" || (gameMode === "multi" && partyIsHost());
+
+  if (canMovePillars) {
+    for (let i = 0; i < pillars.length; i++) {
+      let currentSpeed = cloudSpeed * (1 + (gameMode === "multi" ? shared.score : score) * 0.04);
+      pillars[i].x -= currentSpeed;
+
+      // When pillar goes off screen move it to the end
+      if (pillars[i].x < -pillarWidth) {
+        let maxX = 0;
+        for (let j = 0; j < pillars.length; j++) {
+          if (pillars[j].x > maxX) {
+            maxX = pillars[j].x;
+          }
         }
-      }
-      
-      // Move this pillar to the end with a new random gap
-      cloudPillars[i].x = maxX + pillarSpacing;
-      cloudPillars[i].gapY = random(height * 0.3, height * 0.7);
-      score++;
+        pillars[i].x = maxX + pillarSpacing;
+        pillars[i].gapY = random(height * 0.3, height * 0.7);
 
-      // 15% chance to flip the screen with every score
-      if (random(1) < 0.15) {
-        isFlipped = !isFlipped;
+        // Scoring logic (Fixed nesting here)
+        if (gameMode === "single") {
+          score++;
+          if (random(1) < 0.15) {
+            isFlipped = !isFlipped;
+          }
+        } else if (shared) {
+          shared.score++;
+          if (random(1) < 0.15) {
+            shared.isFlipped = !shared.isFlipped;
+          }
+        }
       }
     }
   }
 
-  // Death if hits ground or ceiling
-  if (birds[0].y > height - birds[0].size / 2 || birds[0].y < 0) {
-    gameState = "dead";
-  }
-
-  // Check collisions with all pillars using for loop
-  for (let i = 0; i < cloudPillars.length; i++) {
-    if (checkCloudCollision(cloudPillars[i])) {
+  // Death checks
+  if (gameMode === "single") {
+    if (birds[0].y > height - birds[0].size / 2 || birds[0].y < 0) {
       gameState = "dead";
+    }
+    for (let i = 0; i < cloudPillars.length; i++) {
+      if (checkCloudCollision(cloudPillars[i], birds[0].y, birds[0].size)) {
+        gameState = "dead";
+      }
+    }
+  } else {
+    // In multiplayer I only check death for my own bird
+    if (me && !me.isDead) {
+      if (me.y > height - birds[0].size / 2 || me.y < 0) {
+        me.isDead = true;
+        me.finalScore = shared.score;
+      }
+      for (let i = 0; i < shared.pillars.length; i++) {
+        if (checkCloudCollision(shared.pillars[i], me.y, birds[0].size)) {
+          me.isDead = true;
+          me.finalScore = shared.score;
+        }
+      }
+    }
+
+    // Sync my local gameState from shared so everyone transitions together
+    if (shared) {
+      gameState = shared.gameState;
+    }
+
+    // Host checks if everyone is dead and triggers leaderboard
+    if (partyIsHost() && shared) {
+      let players = partyGetAll();
+      let allDead = players.length > 0 && players.every(p => p.isDead);
+      if (allDead) {
+        shared.gameState = "leaderboard";
+      }
     }
   }
 }
 
+
 // Draws all game objects
 function drawGame() {
+  let pillars = gameMode === "multi" && shared ? shared.pillars : cloudPillars;
+
   // Draw all pillars using for loop
-  for (let i = 0; i < cloudPillars.length; i++) {
-    drawCloudPillar(cloudPillars[i]);
+  for (let i = 0; i < pillars.length; i++) {
+    drawCloudPillar(pillars[i]);
   }
-  
-  drawBird();
+
+  if (gameMode === "single") {
+    drawBird();
+  } 
+  else {
+    // Draw every players bird and dead ones show faded as ghosts so you can still see them
+    let players = partyGetAll();
+    for (let i = 0; i < players.length; i++) {
+      let c = playerColors[players[i].playerIndex];
+      let alpha = players[i].isDead ? 80 : 255;
+      push();
+      translate(birds[0].x, players[i].y);
+      let angle = constrain(players[i].velocity * 0.05, -0.5, 0.9);
+      rotate(angle);
+      imageMode(CENTER);
+      tint(c[0], c[1], c[2], alpha);
+      image(birdImg, 0, 0, birds[0].size, birds[0].size);
+      noTint();
+      pop();
+    }
+  }
   drawScore();
 }
 
