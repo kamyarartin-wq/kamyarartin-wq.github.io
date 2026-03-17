@@ -223,7 +223,7 @@ function drawWaitingScreen() {
 
   if (gameMode === "single") {
     textSize(34);
-    text("Forest Flyer", width / 2, height / 2 - 100);
+    text("Flappy Bird", width / 2, height / 2 - 100);
     fill(255);
     stroke(0);
     strokeWeight(2);
