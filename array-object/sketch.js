@@ -54,6 +54,23 @@ function preload() {
   mountainBg = loadImage('mountain.jpg');
   natureBg = loadImage('nature.jpg');
   desertBg = loadImage('desert.jpg');
+
+  partyConnect("wss://demoserver.p5party.org", "array-object", onPartyReady);
+
+  shared = partyLoadShared("shared", {
+    pillars: [],
+    score: 0,
+    isFlipped: false,
+    gameState: "waiting"
+  });
+
+  me = partyLoadMe({
+    y: height / 2,
+    velocity: 0,
+    isDead: false,
+    finalScore: 0,
+    playerIndex: playerIndex
+  });
 }
 
 function setup() {
@@ -101,27 +118,6 @@ function createPillars() {
 // Connects to p5.party server and sets up shared and me objects
 // shared holds everything everyone needs to see like pillars and score
 // me holds just my birds data like y position and whether im dead
-function connectMultiplayer() {
-  partyConnect("wss://deepstream.p5party.org", "ForestFlyer_Artin");
-
-  shared = partyLoadShared("shared", {
-    pillars: [],
-    score: 0,
-    isFlipped: false,
-    gameState: "waiting"
-  });
-
-  // Figure out which color slot I get based on how many players joined before me
-  let playerIndex = partyGetAll().length % 5;
-
-  me = partyLoadMe({
-    y: height / 2,
-    velocity: 0,
-    isDead: false,
-    finalScore: 0,
-    playerIndex: playerIndex
-  });
-}
 
 function draw() {
   push();
@@ -262,7 +258,8 @@ function updateGame() {
   if (gameMode === "single") {
     birds[0].velocity += gravity;
     birds[0].y += birds[0].velocity;
-  } else {
+  } 
+  else {
     // In multiplayer I update my own me object instead of birds[0]
     if (me && !me.isDead) {
       me.velocity += gravity;
@@ -274,7 +271,7 @@ function updateGame() {
   let pillars = gameMode === "multi" && shared ? shared.pillars : cloudPillars;
 
   // Only the host moves pillars and scores in multiplayer
-  let canMovePillars = gameMode === "single" || (gameMode === "multi" && partyIsHost());
+  let canMovePillars = gameMode === "single" || gameMode === "multi" && partyIsHost();
 
   if (canMovePillars) {
     for (let i = 0; i < pillars.length; i++) {
@@ -298,7 +295,8 @@ function updateGame() {
           if (random(1) < 0.15) {
             isFlipped = !isFlipped;
           }
-        } else if (shared) {
+        } 
+        else if (shared) {
           shared.score++;
           if (random(1) < 0.15) {
             shared.isFlipped = !shared.isFlipped;
@@ -318,7 +316,8 @@ function updateGame() {
         gameState = "dead";
       }
     }
-  } else {
+  } 
+  else {
     // In multiplayer I only check death for my own bird
     if (me && !me.isDead) {
       if (me.y > height - birds[0].size / 2 || me.y < 0) {
@@ -340,7 +339,7 @@ function updateGame() {
 
     // Host checks if everyone is dead and triggers leaderboard
     if (partyIsHost() && shared) {
-      let players = partyGetAll();
+      let players = partyGetPlayerShared();
       let allDead = players.length > 0 && players.every(p => p.isDead);
       if (allDead) {
         shared.gameState = "leaderboard";
@@ -364,7 +363,7 @@ function drawGame() {
   } 
   else {
     // Draw every players bird and dead ones show faded as ghosts so you can still see them
-    let players = partyGetAll();
+    let players = partyGetPlayerShared();
     for (let i = 0; i < players.length; i++) {
       let c = playerColors[players[i].playerIndex];
       let alpha = players[i].isDead ? 80 : 255;
@@ -603,7 +602,10 @@ function handleMenuClick() {
   let multiY = btnY + btnH * 1.6;
   if (mouseX > width / 2 - btnW / 2 && mouseX < width / 2 + btnW / 2 && mouseY > multiY - btnH / 2 && mouseY < multiY + btnH / 2) {
     gameMode = "multi";
-    connectMultiplayer();
+    
+    let players = partyGetPlayerShared();
+    me.playerIndex = players.length % 5;
+
     gameState = "waiting";
     return;
   }
@@ -612,12 +614,16 @@ function handleMenuClick() {
 // Keyboard interaction
 function keyPressed() {
   if (key === ' ') {
-    if (gameState === "menu") return;  // Space doesn't do anything on menu
+    if (gameState === "menu") {
+      return;  // Space doesn't do anything on menu
+    }
     flap();
   }
   if ((key === 'r' || key === 'R') && (gameState === "dead" || gameState === "leaderboard")) {
     // In multiplayer only host can restart
-    if (gameMode === "multi" && !partyIsHost()) return;
+    if (gameMode === "multi" && !partyIsHost()) {
+      return;
+    }
     resetGame();
   }
 }
