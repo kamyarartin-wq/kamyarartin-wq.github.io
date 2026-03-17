@@ -141,7 +141,7 @@ function draw() {
   if (currentScore > 15) {
     image(natureBg, 0, 0, width, height);
   }
-  else if (currentScoree > 10) {
+  else if (currentScore > 10) {
     image(mountainBg, 0, 0, width, height);
   }
   else if (currentScore > 5) {
@@ -173,7 +173,7 @@ function draw() {
 }
 
 // Title and instructions screen with two buttons to pick single or multiplayer
-function drawWaitingScreen() {
+function drawMenuScreen() {
   drawBird();
 
   fill(30, 30, 80);
@@ -398,6 +398,20 @@ function drawBird() {
   pop();
 }
 
+// Draws any player's bird with their color and position
+// Dead birds get passed alpha = 80 so they show as ghosts
+function drawPlayerBird(y, velocity, color, alpha) {
+  push();
+  translate(birds[0].x, y);
+  let angle = constrain(velocity * 0.05, -0.5, 0.9);
+  rotate(angle);
+  imageMode(CENTER);
+  tint(color[0], color[1], color[2], alpha);
+  image(birdImg, 0, 0, birds[0].size, birds[0].size);
+  noTint();
+  pop();
+}
+
 // Cloud pillar using loop to stack cloud images
 function drawCloudPillar(pillar) {
   let topCloudBottom = pillar.gapY - cloudGapHeight / 2;
@@ -418,32 +432,33 @@ function drawCloudPillar(pillar) {
 }
 
 // Collision detection
-function checkCloudCollision(pillar) {
+function checkCloudCollision(pillar, birdY, birdSize) {
   let topCloudBottom = pillar.gapY - cloudGapHeight / 2;
   let bottomCloudTop = pillar.gapY + cloudGapHeight / 2;
   let hitboxWidth = pillarWidth * 0.80; // It is 0.80 so play doesn't die to edges
-  
-  // Bird hitbox is 60% of visual size
-  let birdHitbox = birds[0].size * 0.6;
+  let birdHitbox = birdSize * 0.6; // Bird hitbox is 60% of visual size
 
   // Check if bird overlaps with pillar horizontally
   let inXRange = birds[0].x + birdHitbox / 2 > pillar.x - hitboxWidth / 2 && birds[0].x - birdHitbox / 2 < pillar.x + hitboxWidth / 2;
 
-  // Check if bird hits top or bottom cloud
-  let hitsTop = birds[0].y - birdHitbox / 2 < topCloudBottom;
-  let hitsBottom = birds[0].y + birdHitbox / 2 > bottomCloudTop;
+  // Check if bird hits top cloud
+  let hitsTop = birdY - birdHitbox / 2 < topCloudBottom;
+
+  // Check if bird hits bottom cloud
+  let hitsBottom = birdY + birdHitbox / 2 > bottomCloudTop;
 
   return inXRange && (hitsTop || hitsBottom);
 }
 
 // Score display
 function drawScore() {
+  let currentScore = gameMode === "multi" && shared ? shared.score : score;
   fill(255);
   stroke(0);
   strokeWeight(3);
   textAlign(CENTER);
   textSize(width * 0.04);
-  text(score, width / 2, height * 0.08);
+  text(currentScore, width / 2, height * 0.08);
 }
 
 // Death screen
@@ -469,39 +484,140 @@ function drawDeadScreen() {
   text("Press R to try again", width / 2, height / 2 + height * 0.08);
 }
 
+// Final leaderboard shown in multiplayer when all birds are dead
+function drawLeaderboard() {
+  fill(0, 0, 0, 180);
+  noStroke();
+  rect(0, 0, width, height);
+
+  textAlign(CENTER);
+  fill(255, 220, 50);
+  stroke(150, 100, 0);
+  strokeWeight(3);
+  textSize(width * 0.05);
+  text("GAME OVER", width / 2, height * 0.2);
+
+  // Sort players by finalScore
+  let players = partyGetAll().slice();
+  players.sort((a, b) => b.finalScore - a.finalScore);
+
+  let medals = ["1st", "2nd", "3rd", "4th", "5th"];
+
+  for (let i = 0; i < players.length; i++) {
+    let c = playerColors[players[i].playerIndex];
+    let isWinner = i === 0;
+
+    fill(c[0], c[1], c[2]);
+    stroke(0);
+    strokeWeight(2);
+    textSize(isWinner ? width * 0.032 : width * 0.025);
+
+    let label = medals[i] + " Player " + (players[i].playerIndex + 1) +" — " + players[i].finalScore + " pts" + (isWinner ? "  👑 WINNER" : "");
+
+    text(label, width / 2, height * 0.35 + i * height * 0.09);
+  }
+
+  fill(255);
+  noStroke();
+  textSize(width * 0.022);
+  text("Host press R to play again", width / 2, height * 0.85);
+}
+
 // Makes bird jump
 function flap() {
-  if (gameState === "waiting") {
-    gameState = "playing";
+  if (gameMode === "single") {
+    if (gameState === "waiting") {
+      gameState = "playing";
+    }
+    if (gameState === "playing") {
+      birds[0].velocity = birds[0].flapStrength;
+    }
   }
-  if (gameState === "playing") {
-    birds[0].velocity = birds[0].flapStrength;
+  else {
+    // In multiplayer, anyone can start the game from the waiting screen
+    if (shared && shared.gameState === "waiting") {
+      shared.gameState = "playing";
+      // Copy pillars into shared so everyone sees the same ones
+      if (partyIsHost()) {
+        shared.pillars = cloudPillars.slice();
+      }
+    }
+    if (me && !me.isDead) {
+      me.velocity = birds[0].flapStrength;
+    }
   }
 }
 
 // Resets game
 function resetGame() {
-  isFlipped = false;
-  birds[0].y = height / 2;
-  birds[0].velocity = 0;
-  score = 0;
-  gameState = "waiting";
-  
-  // Recreate all pillars
-  createPillars();
+  if (gameMode === "single") {
+    isFlipped = false;
+    birds[0].y = height / 2;
+    birds[0].velocity = 0;
+    score = 0;
+    gameState = "waiting";
+    // Recreate all pillars
+    createPillars();
+  }
+  else {
+    // Only host resets shared state so it doesn't conflict
+    if (partyIsHost()) {
+      shared.score = 0;
+      shared.isFlipped = false;
+      shared.gameState = "waiting";
+      createPillars();
+      shared.pillars = cloudPillars.slice();
+    }
+    // Everyone resets their own bird
+    me.y = height / 2;
+    me.velocity = 0;
+    me.isDead = false;
+    me.finalScore = 0;
+    gameState = "waiting";
+  }
 }
 
 // Mouse interaction
 function mousePressed() {
+  if (gameState === "menu") {
+    handleMenuClick();
+    return;
+  }
   flap();
+}
+
+// Checks which button was clicked on the menu screen
+function handleMenuClick() {
+  let btnW = width * 0.25;
+  let btnH = height * 0.08;
+  let btnY = height * 0.5;
+
+  // Single player button
+  if (mouseX > width / 2 - btnW / 2 && mouseX < width / 2 + btnW / 2 && mouseY > btnY - btnH / 2 && mouseY < btnY + btnH / 2) {
+    gameMode = "single";
+    gameState = "waiting";
+    return;
+  }
+
+  // Multiplayer button
+  let multiY = btnY + btnH * 1.6;
+  if (mouseX > width / 2 - btnW / 2 && mouseX < width / 2 + btnW / 2 && mouseY > multiY - btnH / 2 && mouseY < multiY + btnH / 2) {
+    gameMode = "multi";
+    connectMultiplayer();
+    gameState = "waiting";
+    return;
+  }
 }
 
 // Keyboard interaction
 function keyPressed() {
   if (key === ' ') {
+    if (gameState === "menu") return;  // Space doesn't do anything on menu
     flap();
   }
-  if ((key === 'r' || key === 'R') && gameState === "dead") {
+  if ((key === 'r' || key === 'R') && (gameState === "dead" || gameState === "leaderboard")) {
+    // In multiplayer only host can restart
+    if (gameMode === "multi" && !partyIsHost()) return;
     resetGame();
   }
 }
