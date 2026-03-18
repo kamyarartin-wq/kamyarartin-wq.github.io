@@ -147,6 +147,12 @@ function draw() {
     }
   }
 
+  if (gameMode === "multi" && me && shared && shared.gameState === "waiting") {
+    me.playerIndex = partyLoadGuestShareds().indexOf(me);
+    if (me.playerIndex === -1) {
+      me.playerIndex = 0;
+    }
+  }
 
   // Change background based on score shared in multiplayer
   let currentScore = gameMode === "multi" && shared ? shared.score : score;
@@ -317,9 +323,7 @@ function updateGame() {
           }
         } 
         else if (shared) {
-          if (me && !me.isDead) {
-            me.score = (me.score || 0) + 1;
-          }
+          shared.score++;
           if (random(1) < 0.15) {
             shared.isFlipped = !shared.isFlipped;
           }
@@ -337,6 +341,10 @@ function updateGame() {
         playerCount:shared.playerCount
       });
     }
+  }
+
+  if (gameMode === "multi" && me && !me.isDead && shared) {
+    me.score = shared.score;
   }
 
   // Death checks
