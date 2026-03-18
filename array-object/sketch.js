@@ -54,23 +54,6 @@ function preload() {
   mountainBg = loadImage('mountain.jpg');
   natureBg = loadImage('nature.jpg');
   desertBg = loadImage('desert.jpg');
-
-  partyConnect("wss://demoserver.p5party.org", "array-object", onPartyReady);
-
-  shared = partyLoadShared("shared", {
-    pillars: [],
-    score: 0,
-    isFlipped: false,
-    gameState: "waiting"
-  });
-
-  me = partyLoadMe({
-    y: height / 2,
-    velocity: 0,
-    isDead: false,
-    finalScore: 0,
-    playerIndex: playerIndex
-  });
 }
 
 function setup() {
@@ -116,8 +99,27 @@ function createPillars() {
 }
 
 // Connects to p5.party server and sets up shared and me objects
-// shared holds everything everyone needs to see like pillars and score
-// me holds just my birds data like y position and whether im dead
+function connectMultiplayer() {
+  partyConnect("wss://demoserver.p5party.org", "array-object");
+
+  shared = partyLoadShared("shared", {
+    pillars: [],
+    score: 0,
+    isFlipped: false,
+    gameState: "waiting",
+    playerCount: 0
+  });
+
+  // partyLoadGuestShareds gives all other players so I can count how many joined before me
+  me = partyLoadMyShared({
+    y: height / 2,
+    velocity: 0,
+    isDead: false,
+    finalScore: 0,
+    score: 0,
+    playerIndex: partyLoadGuestShareds().length
+  });
+}
 
 function draw() {
   push();
@@ -130,6 +132,10 @@ function draw() {
     translate(width / 2, height / 2);
     rotate(PI); 
     translate(-width / 2, -height / 2);
+  }
+
+  if (gameMode === "multi" && shared) {
+    gameState = shared.gameState;
   }
 
   // Change background based on score shared in multiplayer
@@ -155,9 +161,13 @@ function draw() {
     drawWaitingScreen();
   } 
   else if (gameState === "playing") {
-    updateGame(); drawGame(); 
+    updateGame();
+    drawGame(); 
   }
   else if (gameState === "dead") {
+      if (gameMode === "multi") {
+      updateGame();
+    }
     drawGame();
     drawDeadScreen();
   }
@@ -207,7 +217,7 @@ function drawMenuScreen() {
 }
 
 // Waiting screen works for both modes
-// In singleplayer its just the title screen like before
+// In singleplayer its just the title screen
 // In multiplayer it shows how many players have connected so far
 function drawWaitingScreen() {
   drawBird();
@@ -230,14 +240,14 @@ function drawWaitingScreen() {
   else {
     // Multiplayer lobby shows connected players and their colored birds
     textSize(width * 0.04);
-    text("Forest Flyer", width / 2, height * 0.3);
+    text("Flappy Bird", width / 2, height * 0.3);
     fill(255);
     stroke(0);
     strokeWeight(2);
     textSize(width * 0.022);
 
     // Show player count so everyone knows how many have joined
-    let playerCount = shared ? partyGetAll().length : 1;
+    let playerCount = partyLoadGuestShareds().length;
     text("Players connected: " + playerCount + " / 5", width / 2, height * 0.45);
     text("SPACE or CLICK to start!", width / 2, height * 0.52);
 
@@ -271,7 +281,7 @@ function updateGame() {
   let pillars = gameMode === "multi" && shared ? shared.pillars : cloudPillars;
 
   // Only the host moves pillars and scores in multiplayer
-  let canMovePillars = gameMode === "single" || gameMode === "multi" && partyIsHost();
+  let canMovePillars = gameMode === "single" || (gameMode === "multi" && partyIsHost());
 
   if (canMovePillars) {
     for (let i = 0; i < pillars.length; i++) {
@@ -289,7 +299,7 @@ function updateGame() {
         pillars[i].x = maxX + pillarSpacing;
         pillars[i].gapY = random(height * 0.3, height * 0.7);
 
-        // Scoring logic (Fixed nesting here)
+        // Scoring logic
         if (gameMode === "single") {
           score++;
           if (random(1) < 0.15) {
@@ -297,12 +307,17 @@ function updateGame() {
           }
         } 
         else if (shared) {
-          shared.score++;
+          if (me && !me.isDead) {
+            me.score = (me.score || 0) + 1;
+          }
           if (random(1) < 0.15) {
             shared.isFlipped = !shared.isFlipped;
           }
         }
       }
+    }
+    if (gameMode === "multi" && partyIsHost() && shared) {
+      shared.pillars = pillars;
     }
   }
 
@@ -322,12 +337,12 @@ function updateGame() {
     if (me && !me.isDead) {
       if (me.y > height - birds[0].size / 2 || me.y < 0) {
         me.isDead = true;
-        me.finalScore = shared.score;
+        me.finalScore = me.score || 0;
       }
       for (let i = 0; i < shared.pillars.length; i++) {
         if (checkCloudCollision(shared.pillars[i], me.y, birds[0].size)) {
           me.isDead = true;
-          me.finalScore = shared.score;
+          me.finalScore = me.score || 0;
         }
       }
     }
@@ -339,7 +354,7 @@ function updateGame() {
 
     // Host checks if everyone is dead and triggers leaderboard
     if (partyIsHost() && shared) {
-      let players = partyGetPlayerShared();
+      let players = partyLoadGuestShareds();
       let allDead = players.length > 0 && players.every(p => p.isDead);
       if (allDead) {
         shared.gameState = "leaderboard";
@@ -363,7 +378,7 @@ function drawGame() {
   } 
   else {
     // Draw every players bird and dead ones show faded as ghosts so you can still see them
-    let players = partyGetPlayerShared();
+    let players = partyLoadGuestShareds();
     for (let i = 0; i < players.length; i++) {
       let c = playerColors[players[i].playerIndex];
       let alpha = players[i].isDead ? 80 : 255;
@@ -394,20 +409,6 @@ function drawBird() {
   imageMode(CENTER);
   image(birdImg, 0, 0, birds[0].size, birds[0].size);
   
-  pop();
-}
-
-// Draws any player's bird with their color and position
-// Dead birds get passed alpha = 80 so they show as ghosts
-function drawPlayerBird(y, velocity, color, alpha) {
-  push();
-  translate(birds[0].x, y);
-  let angle = constrain(velocity * 0.05, -0.5, 0.9);
-  rotate(angle);
-  imageMode(CENTER);
-  tint(color[0], color[1], color[2], alpha);
-  image(birdImg, 0, 0, birds[0].size, birds[0].size);
-  noTint();
   pop();
 }
 
@@ -451,7 +452,13 @@ function checkCloudCollision(pillar, birdY, birdSize) {
 
 // Score display
 function drawScore() {
-  let currentScore = gameMode === "multi" && shared ? shared.score : score;
+  let currentScore;
+  if (gameMode === "multi") {
+    currentScore = me ? (me.score || 0) : 0;
+  }
+  else {
+    currentScore = score;
+  }
   fill(255);
   stroke(0);
   strokeWeight(3);
@@ -497,7 +504,7 @@ function drawLeaderboard() {
   text("GAME OVER", width / 2, height * 0.2);
 
   // Sort players by finalScore
-  let players = partyGetAll().slice();
+  let players = partyLoadGuestShareds().slice();
   players.sort((a, b) => b.finalScore - a.finalScore);
 
   let medals = ["1st", "2nd", "3rd", "4th", "5th"];
@@ -511,7 +518,7 @@ function drawLeaderboard() {
     strokeWeight(2);
     textSize(isWinner ? width * 0.032 : width * 0.025);
 
-    let label = medals[i] + " Player " + (players[i].playerIndex + 1) +" — " + players[i].finalScore + " pts" + (isWinner ? "  👑 WINNER" : "");
+    let label = medals[i] + " Player " + (i + 1) +" with " + players[i].finalScore + " pts" + (isWinner ? " is the WINNER" : "");
 
     text(label, width / 2, height * 0.35 + i * height * 0.09);
   }
@@ -534,14 +541,15 @@ function flap() {
   }
   else {
     // In multiplayer, anyone can start the game from the waiting screen
-    if (shared && shared.gameState === "waiting") {
+    if (shared && shared.gameState === "waiting" && partyIsHost()) {
+      shared.pillars = cloudPillars.map(p => ({
+        x: p.x,
+        gapY: p.gapY
+      }));
       shared.gameState = "playing";
-      // Copy pillars into shared so everyone sees the same ones
-      if (partyIsHost()) {
-        shared.pillars = cloudPillars.slice();
       }
-    }
-    if (me && !me.isDead) {
+    // Everyone can flap their own bird once game is running
+    if (me && !me.isDead && shared && shared.gameState === "playing") {
       me.velocity = birds[0].flapStrength;
     }
   }
@@ -572,7 +580,7 @@ function resetGame() {
     me.velocity = 0;
     me.isDead = false;
     me.finalScore = 0;
-    gameState = "waiting";
+    me.score = 0;
   }
 }
 
@@ -602,10 +610,7 @@ function handleMenuClick() {
   let multiY = btnY + btnH * 1.6;
   if (mouseX > width / 2 - btnW / 2 && mouseX < width / 2 + btnW / 2 && mouseY > multiY - btnH / 2 && mouseY < multiY + btnH / 2) {
     gameMode = "multi";
-    
-    let players = partyGetPlayerShared();
-    me.playerIndex = players.length % 5;
-
+    connectMultiplayer();
     gameState = "waiting";
     return;
   }
@@ -620,10 +625,6 @@ function keyPressed() {
     flap();
   }
   if ((key === 'r' || key === 'R') && (gameState === "dead" || gameState === "leaderboard")) {
-    // In multiplayer only host can restart
-    if (gameMode === "multi" && !partyIsHost()) {
-      return;
-    }
     resetGame();
   }
 }
