@@ -7,6 +7,7 @@
 - [Ball Array](ball-array)
 - [Generative Art](g-art)
 - [Perlin Noise](pNoise)
+- [2D Grid](grid)
 
 ## Assignments
 - [Interactive Scene](Interactive-scene)
