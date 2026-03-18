@@ -119,7 +119,7 @@ function connectMultiplayer() {
     isDead: false,
     finalScore: 0,
     score: 0,
-    playerIndex: partyLoadGuestShareds().length
+    playerIndex: partyLoadGuestShareds().length % 5
   });
 }
 
@@ -539,7 +539,7 @@ function drawLeaderboard() {
     let c = playerColors[players[i].playerIndex];
     let isWinner = i === 0;
 
-    fill(c[0], c[1], c[2]);
+    fill(255);
     stroke(0);
     strokeWeight(2);
     textSize(isWinner ? width * 0.032 : width * 0.025);
