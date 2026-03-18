@@ -3,7 +3,9 @@
 // March 5/26
 //
 // Extra for Experts:
-// - describe what you did to take this project "above and beyond"
+// - I used windowResized() to recalculate all sizes as percentages of the window dimensions so the game works on any screen size
+// - Screen flip effect: 15% chance to flip the screen upside down when scoring which was tricky because I had to translate to center, rotate PI, then translate back
+// - I added p5.party so up to 5 players can play at once, each player gets a different color tint and the host controls shared pillar positions and syncs them to all players every 3 frames. When all birds crash a leaderboard shows everyone ranked by score
 
 // Bird array
 let birds = [];
@@ -134,9 +136,17 @@ function draw() {
     translate(-width / 2, -height / 2);
   }
 
+  // Host syncs gameState from shared unless it's dead
+  // its local dead state so the dead branch keeps running updateGame() for pillars
   if (gameMode === "multi" && shared) {
-    gameState = shared.gameState;
+    if (!partyIsHost() || shared.gameState === "leaderboard") {
+      gameState = shared.gameState;
+    } 
+    else if (partyIsHost() && gameState !== "dead") {
+      gameState = shared.gameState;
+    }
   }
+
 
   // Change background based on score shared in multiplayer
   let currentScore = gameMode === "multi" && shared ? shared.score : score;
@@ -165,7 +175,7 @@ function draw() {
     drawGame(); 
   }
   else if (gameState === "dead") {
-      if (gameMode === "multi") {
+    if (gameMode === "multi") {
       updateGame();
     }
     drawGame();
@@ -281,7 +291,7 @@ function updateGame() {
   let pillars = gameMode === "multi" && shared ? shared.pillars : cloudPillars;
 
   // Only the host moves pillars and scores in multiplayer
-  let canMovePillars = gameMode === "single" || (gameMode === "multi" && partyIsHost());
+  let canMovePillars = (gameMode === "single" || gameMode === "multi" && partyIsHost()) && gameState !== "leaderboard" && gameState !== "menu";
 
   if (canMovePillars) {
     for (let i = 0; i < pillars.length; i++) {
@@ -316,8 +326,16 @@ function updateGame() {
         }
       }
     }
-    if (gameMode === "multi" && partyIsHost() && shared) {
-      shared.pillars = pillars;
+    // Force p5.party to detect pillar position changes by setting a fresh copy
+    // Only sync pillars every 3 frames to reduce lag
+    if (gameMode === "multi" && partyIsHost() && shared && frameCount % 3 === 0) {
+      partySetShared(shared, {
+        pillars: pillars.map(p => ({ x: p.x, gapY: p.gapY })),
+        score: shared.score,
+        isFlipped:shared.isFlipped,
+        gameState: shared.gameState,
+        playerCount:shared.playerCount
+      });
     }
   }
 
@@ -348,7 +366,7 @@ function updateGame() {
     }
 
     // Sync my local gameState from shared so everyone transitions together
-    if (shared) {
+    if (shared && !partyIsHost()) {
       gameState = shared.gameState;
     }
 
@@ -454,7 +472,7 @@ function checkCloudCollision(pillar, birdY, birdSize) {
 function drawScore() {
   let currentScore;
   if (gameMode === "multi") {
-    currentScore = me ? (me.score || 0) : 0;
+    currentScore = me ? me.score || 0 : 0;
   }
   else {
     currentScore = score;
@@ -547,7 +565,7 @@ function flap() {
         gapY: p.gapY
       }));
       shared.gameState = "playing";
-      }
+    }
     // Everyone can flap their own bird once game is running
     if (me && !me.isDead && shared && shared.gameState === "playing") {
       me.velocity = birds[0].flapStrength;
