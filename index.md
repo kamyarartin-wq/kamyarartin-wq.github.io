@@ -8,6 +8,7 @@
 - [Generative Art](g-art)
 - [Perlin Noise](pNoise)
 - [2D Grid](grid)
+- [Game of Life](Glife)
 
 ## Assignments
 - [Interactive Scene](Interactive-scene)
