@@ -9,6 +9,7 @@
 - [Perlin Noise](pNoise)
 - [2D Grid](grid)
 - [Game of Life](Glife)
+- [Character in Grid](Cgrid)
 
 ## Assignments
 - [Interactive Scene](Interactive-scene)
