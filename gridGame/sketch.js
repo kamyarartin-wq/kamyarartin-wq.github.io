@@ -36,8 +36,12 @@ function setup() {
   // I use odd numbers so the maze walls work out properly
   cols = Math.floor(width / CELL_SIZE);
   rows = Math.floor(height / CELL_SIZE);
-  if (cols % 2 === 0) cols--;
-  if (rows % 2 === 0) rows--;
+  if (cols % 2 === 0) {
+    cols--;
+  }
+  if (rows % 2 === 0) {
+    rows--;
+  }
 
   generateMaze();
 }
@@ -50,7 +54,8 @@ function draw() {
 
   if (gameState === "dead") {
     drawMessage("YOU HIT A MINE!", "Press R to try again");
-  } else if (gameState === "win") {
+  } 
+  else if (gameState === "win") {
     drawMessage("YOU ESCAPED!", "Press R to play again");
   }
 }
@@ -143,11 +148,14 @@ function drawMaze() {
     for (let c = 0; c < cols; c++) {
       if (grid[r][c] === WALL) {
         fill(60, 80, 60); // dark green walls
-      } else if (grid[r][c] === PATH) {
+      } 
+      else if (grid[r][c] === PATH) {
         fill(200, 190, 160); // sandy path
-      } else if (grid[r][c] === EXIT) {
+      } 
+      else if (grid[r][c] === EXIT) {
         fill(80, 200, 80); // bright green exit
-      } else if (grid[r][c] === MINE) {
+      } 
+      else if (grid[r][c] === MINE) {
         fill(200, 190, 160); // mines look like normal paths so you cant see them
       }
       noStroke();
@@ -182,17 +190,27 @@ function drawMessage(title, subtitle) {
 // Move player with arrow keys
 function keyPressed() {
   if (gameState !== "playing") {
-    if (key === 'r' || key === 'R') generateMaze();
+    if (key === 'r' || key === 'R') {
+      generateMaze();
+    }
     return;
   }
 
   let nc = playerCol;
   let nr = playerRow;
 
-  if (keyCode === UP_ARROW)    nr--;
-  if (keyCode === DOWN_ARROW)  nr++;
-  if (keyCode === LEFT_ARROW)  nc--;
-  if (keyCode === RIGHT_ARROW) nc++;
+  if (keyCode === UP_ARROW) {
+    nr--;
+  }
+  if (keyCode === DOWN_ARROW) {
+    nr++;
+  }
+  if (keyCode === LEFT_ARROW) {
+    nc--;
+  }
+  if (keyCode === RIGHT_ARROW) {
+    nc++;
+  }
 
   // Only move if the new cell is not a wall and is inside the grid
   if (nc >= 0 && nc < cols && nr >= 0 && nr < rows && grid[nr][nc] !== WALL) {
@@ -201,7 +219,8 @@ function keyPressed() {
 
     if (grid[nr][nc] === EXIT) {
       gameState = "win";
-    } else if (grid[nr][nc] === MINE) {
+    } 
+    else if (grid[nr][nc] === MINE) {
       gameState = "dead";
     }
   }
@@ -212,7 +231,11 @@ function windowResized() {
   // Recalculate grid size and regenerate so it fits the new window
   cols = Math.floor(width / CELL_SIZE);
   rows = Math.floor(height / CELL_SIZE);
-  if (cols % 2 === 0) cols--;
-  if (rows % 2 === 0) rows--;
+  if (cols % 2 === 0) {
+    cols--;
+  }
+  if (rows % 2 === 0) {
+    rows--;
+  }
   generateMaze();
 }
