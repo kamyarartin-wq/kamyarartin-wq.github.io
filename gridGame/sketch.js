@@ -124,7 +124,12 @@ function generateMaze() {
 // I had to use odd numbered steps so walls always stay between paths
 function carvePath(c, r) {
   grid[r][c] = PATH;
-  let directions = shuffle([[0, -2], [0, 2], [-2, 0], [2, 0]]);
+
+  let directions = shuffle([[0, -2], 
+    [0, 2], 
+    [-2, 0], 
+    [2, 0]]);
+
   for (let dir of directions) {
     let nc = c + dir[0], nr = r + dir[1];
     // Only carve into cells that are still walls and inside the grid border
@@ -152,7 +157,9 @@ function placeMines() {
 // Checks all active mines each frame and explodes them if MINE_DELAY has passed
 // I loop backwards so I can safely splice without messing up the index
 function handleMineLogic() {
-  if (gameState !== "playing") return;
+  if (gameState !== "playing") {
+    return;
+  }
 
   for (let i = activeMines.length - 1; i >= 0; i--) {
     let m = activeMines[i];
@@ -184,7 +191,9 @@ function drawMaze() {
         continue;
       }
 
-      if (grid[r][c] === WALL) fill(40, 50, 45, opacity);
+      if (grid[r][c] === WALL) {
+        fill(40, 50, 45, opacity);
+      }
       else if (grid[r][c] === PATH) {
         fill(210, 200, 180, opacity);
       }
@@ -221,7 +230,7 @@ function drawPlayer() {
   // sin() on frameCount gives a slow oscillation for the breathing effect
   let breathe = sin(frameCount * 0.1) * 3;
   fill(255, 80, 80);
-  circle(0, 0, (CELL_SIZE * 0.7) + breathe);
+  circle(0, 0, CELL_SIZE * 0.7 + breathe);
   // Two small white circles for eyes
   fill(255);
   circle(-5, -5, 5);
@@ -254,7 +263,9 @@ function keyPressed() {
   let nc = playerCol;
   let nr = playerRow;
 
-  if (keyCode === UP_ARROW) nr--;
+  if (keyCode === UP_ARROW) {
+    nr--;
+  }
   else if (keyCode === DOWN_ARROW) {
     nr++;
   }
