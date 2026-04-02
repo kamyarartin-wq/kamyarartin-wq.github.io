@@ -263,17 +263,19 @@ function keyPressed() {
   let nc = playerCol;
   let nr = playerRow;
 
-  if (keyCode === UP_ARROW) {
-    nr--;
-  }
-  else if (keyCode === DOWN_ARROW) {
-    nr++;
-  }
-  else if (keyCode === LEFT_ARROW) {
-    nc--;
-  }
-  else if (keyCode === RIGHT_ARROW) {
-    nc++;
+  if (gameState === "playing") {
+    if (keyCode === UP_ARROW) {
+      nr--;
+    }
+    else if (keyCode === DOWN_ARROW) {
+      nr++;
+    }
+    else if (keyCode === LEFT_ARROW) {
+      nc--;
+    }
+    else if (keyCode === RIGHT_ARROW) {
+      nc++;
+    }
   }
 
   // Make sure new position is inside the grid and not a wall
