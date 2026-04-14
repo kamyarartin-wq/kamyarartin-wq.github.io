@@ -331,47 +331,73 @@ function handleMineLogic() {
 
 // Draws the maze with fog, tiles that are far from the player fade out
 function drawMaze() {
+  let myCol = gameMode === "multi" && me ? me.col : playerCol;
+  let myRow = gameMode === "multi" && me ? me.row : playerRow;
+  let mines = gameMode === "multi" && shared ? shared.activeMines || [] : activeMines;
+
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      // Calculate distance from player and map it to an opacity value
-      let d = dist(playerCol, playerRow, c, r);
-      let opacity = map(d, VISIBILITY_RADIUS - 2, VISIBILITY_RADIUS, 255, 0);
-      opacity = constrain(opacity, 0, 255);
+      if (!grid[r] || grid[r][c] === undefined) continue;
 
-      // Skip completely invisible tiles to save drawing time
+      // Map distance to opacity so tiles close to me are bright and far ones disappear
+      let d = dist(myCol, myRow, c, r);
+      let opacity = constrain(map(d, VISIBILITY_RADIUS-2, VISIBILITY_RADIUS, 255, 0), 0, 255);
       if (opacity <= 0) {
-        continue;
+        continue; // skip invisible tiles to save drawing time
       }
 
       if (grid[r][c] === WALL) {
         fill(40, 50, 45, opacity);
-      }
+      } 
       else if (grid[r][c] === PATH) {
         fill(210, 200, 180, opacity);
-      }
+      } 
       else if (grid[r][c] === EXIT) {
         fill(50, 220, 100, opacity);
-      }
+      } 
       else if (grid[r][c] === MINE) {
-        // Active mines pulse red so you can see the countdown, hidden ones look like normal path
+        // Active mines pulse red so you can see the countdown
+        // Hidden mines look identical to PATH so you can't tell they're there
         let active = null;
-        for (let k = 0; k < activeMines.length; k++) {
-          if (activeMines[k].r === r && activeMines[k].c === c) {
-            active = activeMines[k];
-            break;
-          }
+        for (let k = 0; k < mines.length; k++) {
+          if (mines[k].r === r && mines[k].c === c) { active = mines[k]; break; }
         }
         if (active) {
           let pulse = map(sin(frameCount * 0.2), -1, 1, 100, 255);
           fill(pulse, 0, 0, opacity);
         } 
         else {
-          fill(210, 200, 180, opacity); // Looks identical to PATH so you can't see
+          fill(210, 200, 180, opacity);
         }
       }
       noStroke();
       rect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
     }
+  }
+}
+
+// Other players are always drawn as colored dots regardless of fog
+// You can see where they are but not what they can see
+function drawOtherPlayers() {
+  if (!shared || !shared.gridReady) {
+    return;
+  }
+  let players = partyLoadGuestShareds();
+  for (let i = 0; i < players.length; i++) {
+    if (players[i] === me) {
+      continue; // don't draw myself twice
+    }
+    let col = playerColors[players[i].playerIndex % 5];
+    let alpha = players[i].isDead ? 80 : 255; // dead players show faded
+    push();
+    translate(players[i].col * CELL_SIZE + CELL_SIZE/2, players[i].row * CELL_SIZE + CELL_SIZE/2);
+    fill(col[0], col[1], col[2], alpha);
+    noStroke();
+    circle(0, 0, CELL_SIZE * 0.7);
+    fill(255, 255, 255, alpha);
+    circle(-5, -5, 5);
+    circle(5, -5, 5);
+    pop();
   }
 }
 
@@ -381,69 +407,228 @@ function drawPlayer() {
   translate(realX + CELL_SIZE / 2, realY + CELL_SIZE / 2);
   // sin() on frameCount gives a slow oscillation for the breathing effect
   let breathe = sin(frameCount * 0.1) * 3;
-  fill(255, 80, 80);
+ if (gameMode === "multi" && me) {
+    let col = playerColors[me.playerIndex % 5];
+    fill(col[0], col[1], col[2]);
+  } 
+  else {
+    fill(255, 80, 80);
+  }
+  noStroke();
   circle(0, 0, CELL_SIZE * 0.7 + breathe);
-  // Two small white circles for eyes
   fill(255);
   circle(-5, -5, 5);
   circle(5, -5, 5);
   pop();
 }
 
+// Title screen with two buttons to pick the mode
+function drawMenuScreen() {
+  textAlign(CENTER, CENTER);
+  fill(255);
+  noStroke();
+  textSize(width * 0.05);
+  text("TRENCH MAZE", width/2, height * 0.3);
+
+  let btnW = width * 0.25;
+  let btnH = height * 0.08;
+
+  // Using rectMode CENTER so I can position the buttons from their midpoint
+  rectMode(CENTER);
+  fill(50, 120, 50);
+  stroke(255);
+  strokeWeight(2);
+  rect(width/2, height * 0.5, btnW, btnH, 10);
+  fill(255);
+  noStroke();
+  textSize(width * 0.025);
+  text("Single Player", width/2, height * 0.5);
+
+  fill(50, 50, 150);
+  stroke(255);
+  strokeWeight(2);
+  rect(width/2, height * 0.5 + btnH * 1.6, btnW, btnH, 10);
+  fill(255);
+  noStroke();
+  text("Multiplayer", width/2, height * 0.5 + btnH * 1.6);
+  rectMode(CORNER);
+}
+
+// Waiting lobby shows how many players have connected so everyone knows when to start
+function drawWaitingScreen() {
+  textAlign(CENTER, CENTER);
+  fill(255);
+  noStroke();
+  textSize(width * 0.04);
+  text("MAZE ESCAPE", width/2, height * 0.35);
+  textSize(width * 0.022);
+  if (gameMode === "multi" && shared) {
+    let playerCount = partyLoadGuestShareds().length;
+    text("Players connected: " + playerCount + " / 5", width/2, height * 0.48);
+    text("Host press SPACE to start", width/2, height * 0.56);
+  }
+}
+
+// Leaderboard ranks players who escaped first, then everyone who died at the bottom
+function drawLeaderboard() {
+  fill(0, 0, 0, 200);
+  noStroke();
+  rect(0, 0, width, height);
+  textAlign(CENTER, CENTER);
+
+  fill(255, 220, 50);
+  textSize(width * 0.05);
+  text("LEADERBOARD", width/2, height * 0.15);
+
+  let players = partyLoadGuestShareds().slice();
+  // Sort escapees by who finished first, dead players fall to the bottom
+  players.sort((a, b) => {
+    if (a.hasEscaped && b.hasEscaped) {
+      return a.finishTime - b.finishTime;
+    }
+    if (a.hasEscaped) {
+      return -1;
+    }
+    if (b.hasEscaped) {
+      return 1;
+    }
+    return 0;
+  });
+
+  let medals = ["1st", "2nd", "3rd", "4th", "5th"];
+  for (let i = 0; i < players.length; i++) {
+    let col = playerColors[players[i].playerIndex % 5];
+    fill(col[0], col[1], col[2]);
+    let isFirst = i === 0 && players[i].hasEscaped;
+    textSize(isFirst ? width * 0.032 : width * 0.025);
+    let status = players[i].hasEscaped ? (isFirst ? " — WINNER" : " — ESCAPED") : " — DEAD";
+    text(medals[i] + " Player " + (i+1) + status, width/2, height * 0.35 + i * height * 0.1);
+  }
+
+  fill(255);
+  noStroke();
+  textSize(width * 0.02);
+  text("Host press R to play again", width/2, height * 0.88);
+}
+
 // Messages for win and dead screens
 function drawMessage(title, subtitle) {
   fill(0, 0, 0, 220);
+  noStroke();
   rect(0, 0, width, height);
   textAlign(CENTER, CENTER);
   fill(255);
   textSize(50);
-  text(title, width / 2, height / 2 - 20);
+  text(title, width/2, height/2 - 20);
   textSize(20);
   fill(200);
-  text(subtitle, width / 2, height / 2 + 40);
+  text(subtitle, width/2, height/2 + 40);
 }
 
-// Arrow keys move the player, R restarts
+
+function mousePressed() {
+  if (gameState === "menu") {
+    handleMenuClick();
+  }
+}
+
+
+// Checks which button was clicked on the menu screen
+function handleMenuClick() {
+  let btnW = width * 0.25;
+  let btnH = height * 0.08;
+  let btnY = height * 0.5;
+
+  if (mouseX > width/2 - btnW/2 && mouseX < width/2 + btnW/2 && mouseY > btnY - btnH/2 && mouseY < btnY + btnH/2) {
+    gameMode = "single";
+    generateMaze();
+    return;
+  }
+
+  let multiY = btnY + btnH * 1.6;
+  if (mouseX > width/2 - btnW/2 && mouseX < width/2 + btnW/2 && mouseY > multiY - btnH/2 && mouseY < multiY + btnH/2) {
+    gameMode = "multi";
+    connectMultiplayer();
+    gameState = "waiting";
+  }
+}
+
+// Arrow keys to move, SPACE to start in multiplayer, R to restart
 function keyPressed() {
-  if (gameState !== "playing") {
-    if (key === 'r' || key === 'R') {
+  // Only the host can start the multiplayer game from the waiting screen
+  if (gameState === "waiting" && gameMode === "multi" && key === ' ' && partyIsHost()) {
+    generateMaze();
+    return;
+  }
+
+  if ((key === 'r' || key === 'R') && (gameState === "dead" || gameState === "win" || gameState === "leaderboard")) {
+    if (gameMode === "single") {
       generateMaze();
-      return;
+    } 
+    else if (gameMode === "multi" && partyIsHost()) {
+      // Setting gameState back to waiting triggers everyone to reset their own me object in draw()
+      shared.gameState = "waiting";
+      shared.gridReady = false;
     }
+    return;
   }
 
-  let nc = playerCol;
-  let nr = playerRow;
-
-  if (gameState === "playing") {
-    if (keyCode === UP_ARROW) {
-      nr--;
-    }
-    else if (keyCode === DOWN_ARROW) {
-      nr++;
-    }
-    else if (keyCode === LEFT_ARROW) {
-      nc--;
-    }
-    else if (keyCode === RIGHT_ARROW) {
-      nc++;
-    }
+  if (gameState !== "playing") {
+    return;
   }
 
-  // Make sure new position is inside the grid and not a wall
-  if (nc >= 0 && nc < cols && nr >= 0 && nr < rows) {
-    if (grid[nr][nc] !== WALL) {
+  let nc = gameMode === "multi" && me ? me.col : playerCol;
+  let nr = gameMode === "multi" && me ? me.row : playerRow;
+
+  if (keyCode === UP_ARROW) {
+    nr--;
+  }
+  else if (keyCode === DOWN_ARROW) {
+    nr++;
+  }
+  else if (keyCode === LEFT_ARROW) {
+    nc--;
+  }
+  else if (keyCode === RIGHT_ARROW) {
+    nc++;
+  }
+
+  if (nc >= 0 && nc < cols && nr >= 0 && nr < rows && grid[nr] && grid[nr][nc] !== WALL) {
+    if (gameMode === "single") {
       playerCol = nc;
       playerRow = nr;
-
       if (grid[nr][nc] === EXIT) {
         gameState = "win";
       } 
       else if (grid[nr][nc] === MINE) {
-        // Only trip the mine once - check if it's already in the active list
+        // Only trip the mine once and check if it's already in the active list
         let alreadyTripped = activeMines.some(m => m.r === nr && m.c === nc);
         if (!alreadyTripped) {
           activeMines.push({ r: nr, c: nc, time: millis() });
+        }
+      }
+    } 
+    else {
+      if (me && !me.isDead && !me.hasEscaped) {
+        me.col = nc;
+        me.row = nr;
+        if (grid[nr][nc] === EXIT) {
+          me.hasEscaped = true;
+          me.finishTime = Date.now(); // Date.now() so the timestamp is consistent across all clients
+          gameState = "win";
+        } 
+        else if (grid[nr][nc] === MINE) {
+          // Push to shared.activeMines so the countdown is visible for everyone
+          let mines = shared.activeMines || [];
+          let alreadyTripped = false;
+          for (let k = 0; k < mines.length; k++) {
+            if (mines[k].r === nr && mines[k].c === nc) { 
+              alreadyTripped = true; break;
+            }
+          }
+          if (!alreadyTripped) {
+            shared.activeMines = [...mines, { r: nr, c: nc, time: Date.now() }];
+          }
         }
       }
     }
@@ -454,5 +639,7 @@ function keyPressed() {
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   initializeGridSize();
-  generateMaze();
+  if (gameMode === "single") {
+    generateMaze();
+  }
 }
