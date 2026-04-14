@@ -267,7 +267,9 @@ function connectMultiplayer() {
 
 // Checks active mines each frame - single player uses local activeMines, multi uses shared.activeMines
 function handleMineLogic() {
-  if (gameState !== "playing") return;
+  if (gameState !== "playing") {
+    return;
+  }
 
   if (gameMode === "single") {
     // Loop backwards so splice doesn't mess up the index
@@ -284,7 +286,8 @@ function handleMineLogic() {
         }
       }
     }
-  } else {
+  } 
+  else {
     if (!me || me.isDead || me.hasEscaped) {
       return;
     }
@@ -337,7 +340,9 @@ function drawMaze() {
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (!grid[r] || grid[r][c] === undefined) continue;
+      if (!grid[r] || grid[r][c] === undefined) {
+        continue;
+      }
 
       // Map distance to opacity so tiles close to me are bright and far ones disappear
       let d = dist(myCol, myRow, c, r);
@@ -360,7 +365,9 @@ function drawMaze() {
         // Hidden mines look identical to PATH so you can't tell they're there
         let active = null;
         for (let k = 0; k < mines.length; k++) {
-          if (mines[k].r === r && mines[k].c === c) { active = mines[k]; break; }
+          if (mines[k].r === r && mines[k].c === c) { 
+            active = mines[k]; break;
+          }
         }
         if (active) {
           let pulse = map(sin(frameCount * 0.2), -1, 1, 100, 255);
@@ -407,7 +414,7 @@ function drawPlayer() {
   translate(realX + CELL_SIZE / 2, realY + CELL_SIZE / 2);
   // sin() on frameCount gives a slow oscillation for the breathing effect
   let breathe = sin(frameCount * 0.1) * 3;
- if (gameMode === "multi" && me) {
+  if (gameMode === "multi" && me) {
     let col = playerColors[me.playerIndex % 5];
     fill(col[0], col[1], col[2]);
   } 
