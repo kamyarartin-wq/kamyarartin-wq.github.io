@@ -23,6 +23,15 @@ const MINE_DELAY = 1300;
 // How many cells around the player are visible
 const VISIBILITY_RADIUS = 4;
 
+// Each player gets a unique color
+const playerColors = [
+  [255, 80,  80 ],  // Player 1 Red
+  [80,  150, 255],  // Player 2 Blue
+  [80,  255, 120],  // Player 3 Green
+  [255, 230, 80 ],  // Player 4 Yellow
+  [200, 80,  255],  // Player 5 Purple
+];
+
 // The 2D array that holds the whole maze
 let grid = [];
 
@@ -34,30 +43,82 @@ let rows;
 let realX;
 let realY;
 
-// Player position in grid coordinates
-let playerCol;
-let playerRow;
+let gameState = "menu";
+let gameMode = "";
 
-let gameState = "playing";
+// activeMines only used in single player, multiplayer uses shared.activeMines instead
+let activeMines = [];
+
+// p5.party objects: shared is the same for everyone, me is just my own data
+let shared;
+let me;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-
   initializeGridSize();
-  generateMaze();
-  realX = playerCol * CELL_SIZE;
-  realY = playerRow * CELL_SIZE;
 }
 
 function draw() {
   background(15);
 
+  // In multiplayer I check shared each frame to stay in sync with the host
+  if (gameMode === "multi" && shared) {
+
+    // When host starts the game and the grid is ready, set up my local state
+    if (shared.gameState === "playing" && gameState === "waiting" && shared.gridReady) {
+      grid = rebuildGrid(shared.flatGrid, shared.mazeCols, shared.mazeRows);
+      cols = shared.mazeCols;
+      rows = shared.mazeRows;
+      me.col = shared.spawnCol;
+      me.row = shared.spawnRow;
+      // Clear spawn tile so no one starts directly on a mine
+      if (grid[me.row]) {
+        grid[me.row][me.col] = PATH;
+      }
+      realX = me.col * CELL_SIZE;
+      realY = me.row * CELL_SIZE;
+      gameState = "playing";
+    }
+
+    // If host resets the game back to waiting, reset my own bird state too
+    if (shared.gameState === "waiting" && (gameState === "dead" || gameState === "win" || gameState === "leaderboard")) {
+      me.isDead = false;
+      me.hasEscaped = false;
+      me.finishTime = 0;
+      gameState = "waiting";
+    }
+
+    // Sync leaderboard trigger from host
+    if (shared.gameState === "leaderboard" && gameState !== "leaderboard") {
+      gameState = "leaderboard";
+    }
+
+    // Keep the grid in sync with shared so mine clears show for everyone
+    if (shared.gridReady && gameState === "playing") {
+      grid = rebuildGrid(shared.flatGrid, shared.mazeCols, shared.mazeRows);
+    }
+  }
+
+  if (gameState === "menu") {
+    drawMenuScreen();
+    return;
+  }
+
+  if (gameState === "waiting") {
+    drawWaitingScreen();
+    return;
+  }
+
   // Lerp smoothly slides realX/realY toward the target grid position each frame
-  let lerpSpeed = 0.2;
-  realX = lerp(realX, playerCol * CELL_SIZE, lerpSpeed);
-  realY = lerp(realY, playerRow * CELL_SIZE, lerpSpeed);
+  let myCol = gameMode === "multi" && me ? me.col : playerCol;
+  let myRow = gameMode === "multi" && me ? me.row : playerRow;
+  realX = lerp(realX, myCol * CELL_SIZE, 0.2);
+  realY = lerp(realY, myRow * CELL_SIZE, 0.2);
 
   drawMaze();
+  if (gameMode === "multi") {
+    drawOtherPlayers();
+  }
   drawPlayer();
   handleMineLogic();
 
@@ -65,11 +126,13 @@ function draw() {
     drawMessage("BOOM!", "Too slow! Press R to restart");
   } 
   else if (gameState === "win") {
-    drawMessage("VICTORY!", "You found the way out! Press R to restart");
+    drawMessage("ESCAPED!", "You found the exit! Press R to restart");
+  } 
+  else if (gameState === "leaderboard") {
+    drawLeaderboard();
   }
 }
 
-// Calculates how many cols and rows fit on screen
 // I force odd numbers because the recursive backtracker needs odd dimensions to work
 function initializeGridSize() {
   cols = Math.floor(width / CELL_SIZE);
@@ -105,18 +168,31 @@ function generateMaze() {
     [cols - 2, rows - 2]];
   corners = shuffle(corners);
 
-  // First shuffled corner is the exit, second is the player spawn
-  let exitPos = corners[0];
-  grid[exitPos[1]][exitPos[0]] = EXIT;
+  let exitPos  = corners[0];
+  let spawnPos = corners[1];
+  grid[exitPos[1]][exitPos[0]]   = EXIT;
+  grid[spawnPos[1]][spawnPos[0]] = PATH; // clear spawn so no mine can land there
 
-  playerCol = corners[1][0];
-  playerRow = corners[1][1];
+  placeMines(spawnPos[0], spawnPos[1]);
 
-  realX = playerCol * CELL_SIZE;
-  realY = playerRow * CELL_SIZE;
-
-  placeMines();
-  gameState = "playing";
+  if (gameMode === "single") {
+    playerCol = spawnPos[0];
+    playerRow = spawnPos[1];
+    realX = playerCol * CELL_SIZE;
+    realY = playerRow * CELL_SIZE;
+    gameState = "playing";
+  } 
+  else if (partyIsHost()) {
+    // Flatten the 2D grid to a 1D array so p5.party can sync it to everyone
+    shared.flatGrid    = grid.flat();
+    shared.mazeCols    = cols;
+    shared.mazeRows    = rows;
+    shared.spawnCol    = spawnPos[0];
+    shared.spawnRow    = spawnPos[1];
+    shared.activeMines = [];
+    shared.gridReady   = true;
+    shared.gameState   = "playing";
+  }
 }
 
 // Recursive function that carves a path through the maze
@@ -154,24 +230,100 @@ function placeMines() {
   }
 }
 
-// Checks all active mines each frame and explodes them if MINE_DELAY has passed
-// I loop backwards so I can safely splice without messing up the index
-function handleMineLogic() {
-  if (gameState !== "playing") {
-    return;
+// p5.party can't sync 2D arrays directly so I flatten to 1D when syncing and rebuild the 2D grid on every client from the flat version
+function rebuildGrid(flat, c, r) {
+  let g = [];
+  for (let row = 0; row < r; row++) {
+    g.push(Array.from(flat.slice(row * c, (row+1) * c)));
   }
+  return g;
+}
 
-  for (let i = activeMines.length - 1; i >= 0; i--) {
-    let m = activeMines[i];
-    if (millis() - m.time > MINE_DELAY) {
-      if (playerCol === m.c && playerRow === m.r) {
-        // Player is still standing on it when it goes off
+// Connects to p5.party and sets up the shared and me objects
+function connectMultiplayer() {
+  partyConnect("wss://demoserver.p5party.org", "maze-escape-v1");
+
+  shared = partyLoadShared("shared", {
+    flatGrid: [],
+    mazeCols: 0,
+    mazeRows: 0,
+    spawnCol: 1,
+    spawnRow: 1,
+    activeMines: [],
+    gridReady: false,
+    gameState: "waiting"
+  });
+
+  // me is my own private data, playerIndex assigns my color from the playerColors array
+  me = partyLoadMyShared({
+    col: 1,
+    row: 1,
+    isDead: false,
+    hasEscaped: false,
+    finishTime: 0,
+    playerIndex: partyLoadGuestShareds().length % 5
+  });
+}
+
+// Checks active mines each frame - single player uses local activeMines, multi uses shared.activeMines
+function handleMineLogic() {
+  if (gameState !== "playing") return;
+
+  if (gameMode === "single") {
+    // Loop backwards so splice doesn't mess up the index
+    for (let i = activeMines.length - 1; i >= 0; i--) {
+      let m = activeMines[i];
+      if (millis() - m.time > MINE_DELAY) {
+        if (playerCol === m.c && playerRow === m.r) {
+          gameState = "dead";
+        } 
+        else {
+          // Player moved away in time so just clear the mine
+          grid[m.r][m.c] = PATH;
+          activeMines.splice(i, 1);
+        }
+      }
+    }
+  } else {
+    if (!me || me.isDead || me.hasEscaped) {
+      return;
+    }
+    let mines = shared.activeMines || [];
+
+    // Check if I'm still standing on any mine that just went off
+    for (let i = 0; i < mines.length; i++) {
+      let m = mines[i];
+      // I use Date.now() instead of millis() so the timestamp is consistent across all clients
+      if (Date.now() - m.time > MINE_DELAY && me.col === m.c && me.row === m.r) {
+        me.isDead = true;
         gameState = "dead";
-      } 
-      else {
-        // Player moved away in time so the mine just disappears
-        grid[m.r][m.c] = PATH;
-        activeMines.splice(i, 1);
+      }
+    }
+
+    // Host is responsible for cleaning up expired mines that no one is standing on anymore
+    if (partyIsHost()) {
+      let players = partyLoadGuestShareds();
+      let newMines = [];
+      for (let i = 0; i < mines.length; i++) {
+        let m = mines[i];
+        if (Date.now() - m.time > MINE_DELAY) {
+          let anyoneOnIt = players.some(p => !p.isDead && p.col === m.c && p.row === m.r);
+          if (!anyoneOnIt) {
+            // Clear it from the flat grid so the sync removes the mine visually for everyone
+            shared.flatGrid[m.r * shared.mazeCols + m.c] = PATH;
+            continue; // don't keep this mine in the list
+          }
+        }
+        newMines.push(m);
+      }
+      if (newMines.length !== mines.length) {
+        shared.activeMines = newMines;
+      }
+
+      // When all players are either dead or escaped, show the leaderboard
+      let allDone = players.length > 0 && players.every(p => p.isDead || p.hasEscaped);
+      if (allDone && shared.gameState !== "leaderboard") {
+        shared.gameState = "leaderboard";
       }
     }
   }
