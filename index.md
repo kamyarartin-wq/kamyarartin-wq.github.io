@@ -10,6 +10,7 @@
 - [2D Grid](grid)
 - [Game of Life](Glife)
 - [Character in Grid](Cgrid)
+- [Walker OOP demo](Woop)
 
 ## Assignments
 - [Interactive Scene](Interactive-scene)
