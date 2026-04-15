@@ -218,10 +218,10 @@ function carvePath(c, r) {
 }
 
 // Goes through every path tile and gives it a small chance to become a mine
-function placeMines() {
+function placeMines(spawnCol, spawnRow) {
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (grid[r][c] === PATH && !(r === playerRow && c === playerCol)) {
+      if (grid[r][c] === PATH && !(r === spawnRow && c === spawnCol)) {
         if (random(1) < MINE_CHANCE) {
           grid[r][c] = MINE;
         }
