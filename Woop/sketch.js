@@ -36,20 +36,41 @@ class Walker {
   }
 }
 
-let artin;
-let aiden;
+let theWalkers = [];
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  artin = new Walker(width/2, height/2);
-  aiden = new Walker(200, 200);
-  aiden.color = "blue";
 }
 
 function draw() {
-  artin.move();
-  aiden.move();
-
-  artin.display();
-  aiden.display();
+  for (let aWalker of theWalkers) {
+    aWalker.move();
+    aWalker.display();
+  }
 }
+
+function mousePressed() {
+  let someWalker = new Walker(mouseX, mouseY);
+  someWalker.color = color(random(255), random(255), random(255));
+  theWalkers.push(someWalker);
+}
+
+// Only two walkers
+
+// let artin;
+// let aiden;
+
+// function setup() {
+//   createCanvas(windowWidth, windowHeight);
+//   artin = new Walker(width/2, height/2);
+//   aiden = new Walker(200, 200);
+//   aiden.color = "blue";
+// }
+
+// function draw() {
+//   artin.move();
+//   aiden.move();
+
+//   artin.display();
+//   aiden.display();
+// }

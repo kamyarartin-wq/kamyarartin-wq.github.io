@@ -11,6 +11,7 @@
 - [Game of Life](Glife)
 - [Character in Grid](Cgrid)
 - [Walker OOP demo](Woop)
+- [Fireworks OOP Demo](fireworkOop)
 
 ## Assignments
 - [Interactive Scene](Interactive-scene)
