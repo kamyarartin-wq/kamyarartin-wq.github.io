@@ -23,10 +23,14 @@ class Particle {
     this.x += this.dx;
     this.y += this.dy;
   }
+
+  isDead() {
+    return this.opacity <= 0;
+  }
 }
 
 let theFireworks = [];
-const NUMBER_OF_FIREWORKS_PER_CLICK = 100;
+const NUMBER_OF_FIREWORKS_PER_CLICK = 200;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -37,7 +41,17 @@ function draw() {
   for (let aFirework of theFireworks) {
     aFirework.update();
     aFirework.display();
+
+    if (aFirework.isDead()) {
+      let index = theFireworks.indexOf(aFirework);
+      theFireworks.splice(index, 1);
+    }
+    else {
+      aFirework.update();
+      aFirework.display();
+    }
   }
+  mousePressed();
 }
 
 function mousePressed() {
