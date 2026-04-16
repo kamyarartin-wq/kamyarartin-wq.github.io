@@ -1,9 +1,12 @@
-// Project Title
-// Your Name
-// Date
+// Grid Based Game
+// Artin Kamyar
+// March 27
 //
 // Extra for Experts:
-// - describe what you did to take this project "above and beyond"
+// - Fog of war so you can only see tiles close to you, but other players are always visible as colored dots no matter how far away
+// - Smooth lerp movement instead of snapping cell to cell
+// - p5.party multiplayer where the host generates the maze and flattens the 2D grid to 1D to sync it
+//   since p5.party can't handle 2D arrays directly, everyone rebuilds it locally from the flat version
 
 // Cell types stored in the 2D grid
 const WALL = 0;
