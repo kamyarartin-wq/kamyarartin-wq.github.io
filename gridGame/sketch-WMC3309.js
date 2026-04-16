@@ -604,7 +604,7 @@ function mousePressed() {
   if (gameState === "menu") {
     handleMenuClick();
   }
-  else if (gameState === "colorPicker") {
+   else if (gameState === "colorPicker") {
     handleColorPickerClick();
   }
 }
