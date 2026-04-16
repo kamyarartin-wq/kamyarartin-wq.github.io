@@ -49,6 +49,9 @@ let gameMode = "";
 // activeMines only used in single player, multiplayer uses shared.activeMines instead
 let activeMines = [];
 
+// The color index the player picks before connecting so it's ready when me is created
+let chosenColorIndex = 0;
+
 // p5.party objects: shared is the same for everyone, me is just my own data
 let shared;
 let me;
@@ -61,17 +64,24 @@ function setup() {
 function draw() {
   background(15);
 
-  // In multiplayer I check shared each frame to stay in sync with the host
+  // Every frame I check shared to stay in sync with whatever the host is doing
   if (gameMode === "multi" && shared) {
 
-    // When host starts the game and the grid is ready, set up my local state
+    // Reassign playerIndex each frame during waiting so the color stays correct
+    // if I check it too early partyLoadGuestShareds might not include me yet
+    if (shared.gameState === "waiting" && me) {
+      let idx = partyLoadGuestShareds().indexOf(me);
+      me.playerIndex = idx === -1 ? 0 : idx;
+    }
+
+    // Once the host flips to playing and the grid is ready, set myself up locally
     if (shared.gameState === "playing" && gameState === "waiting" && shared.gridReady) {
       grid = rebuildGrid(shared.flatGrid, shared.mazeCols, shared.mazeRows);
       cols = shared.mazeCols;
       rows = shared.mazeRows;
       me.col = shared.spawnCol;
       me.row = shared.spawnRow;
-      // Clear spawn tile so no one starts directly on a mine
+      // Clear the spawn tile just in case a mine landed there
       if (grid[me.row]) {
         grid[me.row][me.col] = PATH;
       }
@@ -80,7 +90,7 @@ function draw() {
       gameState = "playing";
     }
 
-    // If host resets the game back to waiting, reset my own bird state too
+    // If host resets to waiting, wipe my own state too so I'm ready for the next round
     if (shared.gameState === "waiting" && (gameState === "dead" || gameState === "win" || gameState === "leaderboard")) {
       me.isDead = false;
       me.hasEscaped = false;
@@ -88,19 +98,34 @@ function draw() {
       gameState = "waiting";
     }
 
-    // Sync leaderboard trigger from host
+    // Leaderboard trigger comes from the host, everyone just follows along
     if (shared.gameState === "leaderboard" && gameState !== "leaderboard") {
       gameState = "leaderboard";
     }
 
-    // Keep the grid in sync with shared so mine clears show for everyone
+    // Keep syncing the grid so mine clears show up for everyone
     if (shared.gridReady && gameState === "playing") {
       grid = rebuildGrid(shared.flatGrid, shared.mazeCols, shared.mazeRows);
     }
+
+    // Host checks every frame whether all players are done so the leaderboard triggers at the right time
+    if (partyIsHost() && shared.gameState === "playing") {
+      let players = partyLoadGuestShareds();
+      let allDone = players.length > 0 && players.every(p => p.isDead || p.hasEscaped);
+      if (allDone) {
+        shared.gameState = "leaderboard";
+      }
+    }
   }
 
+  // Game state machine - each state calls its own draw function
   if (gameState === "menu") {
     drawMenuScreen();
+    return;
+  }
+
+  if (gameState === "colorPicker") {
+    drawColorPicker();
     return;
   }
 
@@ -124,10 +149,10 @@ function draw() {
 
   if (gameState === "dead") {
     drawMessage("BOOM!", "Too slow! Press R to restart");
-  } 
+  }
   else if (gameState === "win") {
     drawMessage("ESCAPED!", "You found the exit! Press R to restart");
-  } 
+  }
   else if (gameState === "leaderboard") {
     drawLeaderboard();
   }
@@ -201,13 +226,15 @@ function generateMaze() {
 function carvePath(c, r) {
   grid[r][c] = PATH;
 
-  let directions = shuffle([[0, -2], 
+  let directions = shuffle([
+    [0, -2], 
     [0, 2], 
     [-2, 0], 
     [2, 0]]);
 
   for (let dir of directions) {
-    let nc = c + dir[0], nr = r + dir[1];
+    let nc = c + dir[0];
+    let nr = r + dir[1];
     // Only carve into cells that are still walls and inside the grid border
     if (nc > 0 && nc < cols - 1 && nr > 0 && nr < rows - 1 && grid[nr][nc] === WALL) {
       // Carve the wall between current cell and neighbour to connect them
@@ -261,7 +288,7 @@ function connectMultiplayer() {
     isDead: false,
     hasEscaped: false,
     finishTime: 0,
-    playerIndex: partyLoadGuestShareds().length % 5
+    playerIndex: chosenColorIndex
   });
 }
 
@@ -322,12 +349,6 @@ function handleMineLogic() {
       if (newMines.length !== mines.length) {
         shared.activeMines = newMines;
       }
-
-      // When all players are either dead or escaped, show the leaderboard
-      let allDone = players.length > 0 && players.every(p => p.isDead || p.hasEscaped);
-      if (allDone && shared.gameState !== "leaderboard") {
-        shared.gameState = "leaderboard";
-      }
     }
   }
 }
@@ -366,7 +387,8 @@ function drawMaze() {
         let active = null;
         for (let k = 0; k < mines.length; k++) {
           if (mines[k].r === r && mines[k].c === c) { 
-            active = mines[k]; break;
+            active = mines[k]; 
+            break;
           }
         }
         if (active) {
@@ -397,7 +419,7 @@ function drawOtherPlayers() {
     let col = playerColors[players[i].playerIndex % 5];
     let alpha = players[i].isDead ? 80 : 255; // dead players show faded
     push();
-    translate(players[i].col * CELL_SIZE + CELL_SIZE/2, players[i].row * CELL_SIZE + CELL_SIZE/2);
+    translate(players[i].col * CELL_SIZE + CELL_SIZE / 2, players[i].row * CELL_SIZE + CELL_SIZE / 2);
     fill(col[0], col[1], col[2], alpha);
     noStroke();
     circle(0, 0, CELL_SIZE * 0.7);
@@ -461,6 +483,48 @@ function drawMenuScreen() {
   rectMode(CORNER);
 }
 
+// Color picker lets each player choose their color before connecting
+// I added this so players can actually tell each other apart instead of being assigned randomly
+function drawColorPicker() {
+  textAlign(CENTER, CENTER);
+  fill(255);
+  noStroke();
+  textSize(width * 0.04);
+  text("Pick your color", width / 2, height * 0.3);
+  textSize(width * 0.018);
+  fill(180);
+  text("Click a color to join", width / 2, height * 0.4);
+
+  let spacing = width * 0.12;
+  let startX = width / 2 - spacing * 2;
+  let y = height * 0.58;
+  let r = CELL_SIZE * 0.9;
+
+  // Draw one circle per color with a hover highlight effect
+  for (let i = 0; i < playerColors.length; i++) {
+    let x = startX + i * spacing;
+    let col = playerColors[i];
+
+    let hovered = dist(mouseX, mouseY, x, y) < r;
+    if (hovered) {
+      fill(255, 255, 255, 60);
+      noStroke();
+      circle(x, y, r * 2 + 16);
+    }
+
+    fill(col[0], col[1], col[2]);
+    stroke(255);
+    strokeWeight(hovered ? 3 : 1);
+    circle(x, y, r * 2);
+
+    // Little eyes so each color circle looks like a player
+    fill(255);
+    noStroke();
+    circle(x - 5, y - 4, 5);
+    circle(x + 5, y - 4, 5);
+  }
+}
+
 // Waiting lobby shows how many players have connected so everyone knows when to start
 function drawWaitingScreen() {
   textAlign(CENTER, CENTER);
@@ -508,7 +572,7 @@ function drawLeaderboard() {
     fill(col[0], col[1], col[2]);
     let isFirst = i === 0 && players[i].hasEscaped;
     textSize(isFirst ? width * 0.032 : width * 0.025);
-    let status = players[i].hasEscaped ? (isFirst ? " — WINNER" : " — ESCAPED") : " — DEAD";
+    let status = players[i].hasEscaped ? (isFirst ? " WINNER" : " ESCAPED") : " DEAD";
     text(medals[i] + " Player " + (i+1) + status, width/2, height * 0.35 + i * height * 0.1);
   }
 
@@ -537,8 +601,10 @@ function mousePressed() {
   if (gameState === "menu") {
     handleMenuClick();
   }
+   else if (gameState === "colorPicker") {
+    handleColorPickerClick();
+  }
 }
-
 
 // Checks which button was clicked on the menu screen
 function handleMenuClick() {
@@ -546,17 +612,37 @@ function handleMenuClick() {
   let btnH = height * 0.08;
   let btnY = height * 0.5;
 
-  if (mouseX > width/2 - btnW/2 && mouseX < width/2 + btnW/2 && mouseY > btnY - btnH/2 && mouseY < btnY + btnH/2) {
+  if (mouseX > width / 2 - btnW / 2 && mouseX < width / 2 + btnW / 2 &&
+    mouseY > btnY - btnH / 2 && mouseY < btnY + btnH / 2) {
     gameMode = "single";
     generateMaze();
     return;
   }
 
   let multiY = btnY + btnH * 1.6;
-  if (mouseX > width/2 - btnW/2 && mouseX < width/2 + btnW/2 && mouseY > multiY - btnH/2 && mouseY < multiY + btnH/2) {
+  if (mouseX > width / 2 - btnW / 2 && mouseX < width / 2 + btnW / 2 &&
+    mouseY > multiY - btnH / 2 && mouseY < multiY + btnH / 2) {
     gameMode = "multi";
-    connectMultiplayer();
-    gameState = "waiting";
+    gameState = "colorPicker"; // go to color picker before connecting
+  }
+}
+
+// Checks which color circle was clicked and connects with that color
+function handleColorPickerClick() {
+  let spacing = width * 0.12;
+  let startX = width / 2 - spacing * 2;
+  let y = height * 0.58;
+  let r = CELL_SIZE * 0.9;
+
+  for (let i = 0; i < playerColors.length; i++) {
+    let x = startX + i * spacing;
+    if (dist(mouseX, mouseY, x, y) < r) {
+      chosenColorIndex = i;
+      connectMultiplayer();
+      me.playerIndex = chosenColorIndex; // override immediately so the color shows right away
+      gameState = "waiting";
+      return;
+    }
   }
 }
 
@@ -587,16 +673,16 @@ function keyPressed() {
   let nc = gameMode === "multi" && me ? me.col : playerCol;
   let nr = gameMode === "multi" && me ? me.row : playerRow;
 
-  if (keyCode === UP_ARROW) {
+  if (keyCode === UP_ARROW || key === 'w' || key === 'W') {
     nr--;
   }
-  else if (keyCode === DOWN_ARROW) {
+  else if (keyCode === DOWN_ARROW || key === 's' || key === 'S') {
     nr++;
   }
-  else if (keyCode === LEFT_ARROW) {
+  else if (keyCode === LEFT_ARROW || key === 'a' || key === 'A') {
     nc--;
   }
-  else if (keyCode === RIGHT_ARROW) {
+  else if (keyCode === RIGHT_ARROW || key === 'd' || key === 'D') {
     nc++;
   }
 
@@ -630,7 +716,8 @@ function keyPressed() {
           let alreadyTripped = false;
           for (let k = 0; k < mines.length; k++) {
             if (mines[k].r === nr && mines[k].c === nc) { 
-              alreadyTripped = true; break;
+              alreadyTripped = true; 
+              break;
             }
           }
           if (!alreadyTripped) {
