@@ -12,6 +12,7 @@
 - [Character in Grid](Cgrid)
 - [Walker OOP demo](Woop)
 - [Fireworks OOP Demo](fireworkOop)
+- [Connected Nodes OOP](nodesOop)
 
 ## Assignments
 - [Interactive Scene](Interactive-scene)
