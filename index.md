@@ -13,6 +13,7 @@
 - [Walker OOP demo](Woop)
 - [Fireworks OOP Demo](fireworkOop)
 - [Connected Nodes OOP](nodesOop)
+- [OOP Inheritance](OopInheritance)
 
 ## Assignments
 - [Interactive Scene](Interactive-scene)
