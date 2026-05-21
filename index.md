@@ -15,6 +15,7 @@
 - [Connected Nodes OOP](nodesOop)
 - [OOP Inheritance](OopInheritance)
 - [Collide2d](collide)
+- [Recursive circles](rC)
 
 ## Assignments
 - [Interactive Scene](Interactive-scene)
